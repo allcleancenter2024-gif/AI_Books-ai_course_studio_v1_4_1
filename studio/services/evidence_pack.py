@@ -80,9 +80,14 @@ def evidence_quality(pack: dict) -> dict:
     items = pack.get("items", []) if isinstance(pack, dict) else []
     issues = []
     for item in items:
-        if not item.get("source_url") or not item.get("source_title"): issues.append({"severity": "critical", "message": "출처 URL과 제목이 필요합니다."})
+        url = str(item.get("source_url") or "")
+        if not url or not item.get("source_title") or urlparse(url).scheme not in {"http", "https"}:
+            issues.append({"severity": "critical", "message": "출처 URL과 제목이 필요하며 URL은 HTTP(S)여야 합니다."})
         if not item.get("evidence_summary"): issues.append({"severity": "major", "message": "근거 요약이 비어 있습니다."})
         if not item.get("retrieved_at"): issues.append({"severity": "major", "message": "수집일이 없습니다."})
+        claim, summary = str(item.get("claim") or "").strip(), str(item.get("evidence_summary") or "").casefold()
+        if claim and claim.casefold() not in summary:
+            issues.append({"severity": "major", "message": "주장과 근거 요약의 연결을 확인해야 합니다."})
     if not items: issues.append({"severity": "critical", "message": "사용 가능한 근거가 없습니다."})
     score = max(0, 100 - 30 * sum(x["severity"] == "critical" for x in issues) - 10 * sum(x["severity"] == "major" for x in issues))
     return {"score": score, "publishable": bool(items) and not any(x["severity"] == "critical" for x in issues), "issues": issues, "checked_at": datetime.now(timezone.utc).isoformat()}
