@@ -1,0 +1,28 @@
+.env
+.env.searxng
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest_tmp/
+node_modules/
+
+# Runtime/user data and generated artifacts
+data/
+uploads/
+exports/
+output/
+logs/
+backups/
+dist/
+build/
+previous_versions/
+_internal/
+*.exe
+*.spec
+
+# Local/provider credentials and private keys
+providers/*
+!providers/__init__.py
+!providers/engine.py

@@ -1,0 +1,29 @@
+use_default_settings: true
+
+general:
+  instance_name: "AI Course Studio Search"
+  debug: false
+
+search:
+  safe_search: 1
+  autocomplete: ""
+  formats:
+    - html
+    - json
+
+server:
+  bind_address: "0.0.0.0"
+  port: 8080
+  limiter: false
+  image_proxy: false
+  secret_key: "ultrasecretkey"
+
+ui:
+  static_use_hash: true
+
+outgoing:
+  request_timeout: 10.0
+  max_request_timeout: 15.0
+  pool_connections: 40
+  pool_maxsize: 10
+  enable_http2: true
