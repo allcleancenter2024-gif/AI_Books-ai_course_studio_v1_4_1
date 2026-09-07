@@ -28,6 +28,7 @@ class JobStore:
     def __init__(self):
         self._items: dict[str, Job] = {}
         self._lock = RLock()
+        self._table_ready = False
         self._recover_interrupted()
 
     def _recover_interrupted(self) -> None:
@@ -36,12 +37,15 @@ class JobStore:
             conn.execute("UPDATE job_states SET phase='interrupted', message='서버 재시작으로 작업이 중단되었습니다. 재개할 수 있습니다.' WHERE phase IN ('queued','generating','saving','summarizing','uploading','parsing')")
 
     def _ensure_table(self) -> None:
+        if self._table_ready:
+            return
         with connect() as conn:
             conn.execute("""CREATE TABLE IF NOT EXISTS job_states(
                 id TEXT PRIMARY KEY, phase TEXT NOT NULL, message TEXT NOT NULL, progress INTEGER NOT NULL DEFAULT 0,
                 bytes_done INTEGER NOT NULL DEFAULT 0, bytes_total INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '',
                 result_json TEXT, payload_json TEXT, updated_at TEXT NOT NULL)""")
             if "payload_json" not in {row[1] for row in conn.execute("PRAGMA table_info(job_states)")}: conn.execute("ALTER TABLE job_states ADD COLUMN payload_json TEXT")
+        self._table_ready = True
 
     def _load(self, job_id: str) -> Job | None:
         self._ensure_table()
