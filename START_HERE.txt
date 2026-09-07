@@ -1,0 +1,22 @@
+AI Course Studio v1.24.0
+=======================
+
+1) Extract this ZIP to a NEW folder.
+2) Double-click run_windows.bat (or DTS_Book_12_Auotexe.bat).
+3) The launcher checks port 8765.
+   - If Studio v1.24.0 is already running, it opens it.
+   - If an older AI Course Studio is running, it verifies the app and replaces the old server.
+   - If an unrelated program uses 8765, it stops safely and shows an error.
+4) Browser address: http://127.0.0.1:8765
+5) Confirm BOTH items show v1.24.0:
+   - Page title/header
+   - Top status bar server version
+6) The opening screen requires the local admin account. After login, the left menu contains the Studio workflow, including:
+   - 2. 참고자료
+   - 3. Gemini Notebook
+   - 8. 최신 정보
+   - 11. 변경된 내용 안내
+   - 12. 설치 및 운영 설명서
+
+If startup fails, run run_windows_debug.bat and check logs/startup_error.log.
+The first screen uses the supplied cinematic MP4 background and the Studio API requires a valid session.
