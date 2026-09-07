@@ -20,6 +20,7 @@ class Job:
     # Small, public completion metadata only (for example, a source-summary
     # download URL).  Never place provider credentials or raw source text here.
     result: dict | None = None
+    payload: dict | None = None
     updated_at: str = ""
 
 
@@ -27,13 +28,20 @@ class JobStore:
     def __init__(self):
         self._items: dict[str, Job] = {}
         self._lock = RLock()
+        self._recover_interrupted()
+
+    def _recover_interrupted(self) -> None:
+        self._ensure_table()
+        with connect() as conn:
+            conn.execute("UPDATE job_states SET phase='interrupted', message='서버 재시작으로 작업이 중단되었습니다. 재개할 수 있습니다.' WHERE phase IN ('queued','generating','saving','summarizing','uploading','parsing')")
 
     def _ensure_table(self) -> None:
         with connect() as conn:
             conn.execute("""CREATE TABLE IF NOT EXISTS job_states(
                 id TEXT PRIMARY KEY, phase TEXT NOT NULL, message TEXT NOT NULL, progress INTEGER NOT NULL DEFAULT 0,
                 bytes_done INTEGER NOT NULL DEFAULT 0, bytes_total INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '',
-                result_json TEXT, updated_at TEXT NOT NULL)""")
+                result_json TEXT, payload_json TEXT, updated_at TEXT NOT NULL)""")
+            if "payload_json" not in {row[1] for row in conn.execute("PRAGMA table_info(job_states)")}: conn.execute("ALTER TABLE job_states ADD COLUMN payload_json TEXT")
 
     def _load(self, job_id: str) -> Job | None:
         self._ensure_table()
@@ -43,6 +51,7 @@ class JobStore:
             return None
         data = dict(row)
         data["result"] = json.loads(data.pop("result_json")) if data.get("result_json") else None
+        data["payload"] = json.loads(data.pop("payload_json")) if data.get("payload_json") else None
         return Job(**data)
 
     def update(self, job_id: str, **values) -> dict:
@@ -56,13 +65,14 @@ class JobStore:
             self._ensure_table()
             with connect() as conn:
                 conn.execute("""INSERT INTO job_states
-                    (id,phase,message,progress,bytes_done,bytes_total,error,result_json,updated_at)
-                    VALUES(?,?,?,?,?,?,?,?,?)
+                    (id,phase,message,progress,bytes_done,bytes_total,error,result_json,payload_json,updated_at)
+                    VALUES(?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET phase=excluded.phase,message=excluded.message,
                     progress=excluded.progress,bytes_done=excluded.bytes_done,bytes_total=excluded.bytes_total,
-                    error=excluded.error,result_json=excluded.result_json,updated_at=excluded.updated_at""",
+                    error=excluded.error,result_json=excluded.result_json,payload_json=excluded.payload_json,updated_at=excluded.updated_at""",
                     (job.id, job.phase, job.message, job.progress, job.bytes_done, job.bytes_total,
-                     job.error, json.dumps(job.result, ensure_ascii=False) if job.result is not None else None, job.updated_at))
+                     job.error, json.dumps(job.result, ensure_ascii=False) if job.result is not None else None,
+                     json.dumps(job.payload, ensure_ascii=False) if job.payload is not None else None, job.updated_at))
             return asdict(job)
 
     def get(self, job_id: str) -> dict | None:

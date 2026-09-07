@@ -44,7 +44,9 @@ def init_db():
     cur.execute("""CREATE TABLE IF NOT EXISTS job_states(
         id TEXT PRIMARY KEY, phase TEXT NOT NULL, message TEXT NOT NULL, progress INTEGER NOT NULL DEFAULT 0,
         bytes_done INTEGER NOT NULL DEFAULT 0, bytes_total INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '',
-        result_json TEXT, updated_at TEXT NOT NULL)""")
+        result_json TEXT, payload_json TEXT, updated_at TEXT NOT NULL)""")
+    if "payload_json" not in {row[1] for row in cur.execute("PRAGMA table_info(job_states)")}: 
+        cur.execute("ALTER TABLE job_states ADD COLUMN payload_json TEXT")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_job_states_updated_at ON job_states(updated_at)")
     cur.execute("""CREATE TABLE IF NOT EXISTS manual_update_state(
         id INTEGER PRIMARY KEY CHECK(id=1), snapshot_json TEXT NOT NULL,

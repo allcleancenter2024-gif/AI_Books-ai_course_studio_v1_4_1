@@ -343,7 +343,10 @@ def start_book_generation(provider,weeks,audience,start,end=None,source_ids=None
             if existing and existing.get('phase') not in {'complete','error'}:
                 return {'job_id':current,'accepted':True,'already_running':True}
         _active_book_jobs[requested_id]=requested_id
-        jobs.update(requested_id,phase='queued',message='교재 생성 작업을 대기열에 추가했습니다.',progress=1,error='',result=None)
+        jobs.update(requested_id,phase='queued',message='교재 생성 작업을 대기열에 추가했습니다.',progress=1,error='',result=None,
+                    payload={'kind':'book_generation','provider':provider,'weeks':weeks,'audience':audience,'start':start,'end':end,
+                             'source_ids':source_ids or [],'experience':experience,'device_paths':device_paths or [],'edition':edition,
+                             'generation_mode':generation_mode,'web_scope':web_scope})
     def run():
         try:
             result=build_book(provider,weeks,audience,start,end,source_ids,requested_id,experience,device_paths,edition,generation_mode,web_scope)
