@@ -20,7 +20,7 @@ from .summarization import summarize_text
 from .upload import receive_and_parse
 from .vector_index import index_source
 
-from ..config import SOURCE_PACKS_DIR, SUMMARY_EXPORTS_DIR
+from ..config import SOURCE_PACKS_DIR, SUMMARY_EXPORTS_DIR, SUMMARY_MAX_CONCURRENT, SUMMARY_QUEUE_LIMIT
 from ..db import connect
 from ..multidb import mirror_source, delete_source as delete_source_mirror, source_record, source_records, create_source_record, update_source_record
 from .job_status import jobs
@@ -30,6 +30,10 @@ CONTEXT_PER_SOURCE = 8_000
 ALLOWED_EXT = {'.md','.markdown','.txt','.html','.htm','.pdf','.pptx','.png','.jpg','.jpeg','.webp'}
 _summary_job_lock = threading.RLock()
 _active_summary_jobs: dict[int, str] = {}
+# Counts both running and queued jobs. Non-blocking acquisition means a
+# saturated queue is rejected immediately instead of creating unbounded
+# threads or leaving an HTTP request waiting indefinitely.
+_summary_slots = threading.BoundedSemaphore(SUMMARY_MAX_CONCURRENT + SUMMARY_QUEUE_LIMIT)
 
 
 def _now() -> str:
@@ -286,8 +290,15 @@ def start_source_summary(source_id: int, provider_manager, provider: str, job_id
                     'accepted': True,
                     'already_running': True,
                 }
+        if not _summary_slots.acquire(blocking=False):
+            raise HTTPException(429, '요약 작업 대기열이 가득 찼습니다. 현재 작업이 끝난 뒤 다시 시도하세요.')
         _active_summary_jobs[source_id] = requested_id
-        jobs.update(requested_id, phase='queued', message='요약 작업을 대기열에 추가했습니다.', progress=1, error='', result=None)
+        try:
+            jobs.update(requested_id, phase='queued', message='요약 작업을 대기열에 추가했습니다.', progress=1, error='', result=None)
+        except Exception:
+            _active_summary_jobs.pop(source_id, None)
+            _summary_slots.release()
+            raise
 
     def run() -> None:
         try:
@@ -297,11 +308,19 @@ def start_source_summary(source_id: int, provider_manager, provider: str, job_id
             detail = str(getattr(exc, 'detail', exc))
             jobs.update(requested_id, phase='error', message='자료 요약 실패', progress=100, error=detail[:1000])
         finally:
+            _summary_slots.release()
             with _summary_job_lock:
                 if _active_summary_jobs.get(source_id) == requested_id:
                     _active_summary_jobs.pop(source_id, None)
 
-    threading.Thread(target=run, name=f'source-summary-{source_id}', daemon=True).start()
+    try:
+        threading.Thread(target=run, name=f'source-summary-{source_id}', daemon=True).start()
+    except Exception:
+        with _summary_job_lock:
+            if _active_summary_jobs.get(source_id) == requested_id:
+                _active_summary_jobs.pop(source_id, None)
+        _summary_slots.release()
+        raise
     return {'job_id': requested_id, 'source_id': source_id, 'title': source['title'], 'accepted': True, 'already_running': False}
 
 

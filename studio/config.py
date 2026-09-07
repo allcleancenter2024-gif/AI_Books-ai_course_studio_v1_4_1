@@ -29,6 +29,19 @@ PDF_OUTPUT_DIR = RUNTIME_DIR / "output" / "pdf"
 MAX_UPLOAD_BYTES = 500 * 1024 * 1024
 UPLOAD_CHUNK_BYTES = 1024 * 1024
 EXTRACTED_TEXT_LIMIT = 120_000
+# Summary calls are deliberately bounded: a single worker protects local
+# models and a small queue prevents unbounded thread/memory growth when
+# several browser tabs submit large documents at once.
+def _safe_limit(name: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(maximum, value))
+
+
+SUMMARY_MAX_CONCURRENT = _safe_limit("AI_COURSE_STUDIO_SUMMARY_MAX_CONCURRENT", 1, 1, 2)
+SUMMARY_QUEUE_LIMIT = _safe_limit("AI_COURSE_STUDIO_SUMMARY_QUEUE_LIMIT", 2, 0, 4)
 AUTH_COOKIE_SECURE = os.getenv("AI_COURSE_STUDIO_COOKIE_SECURE", "0") == "1"
 
 for path in (DB_PATH.parent, EXPORTS_DIR, BOOK_EXPORTS_DIR, LOGS_DIR, UPLOADS_DIR, SOURCE_PACKS_DIR, SUMMARY_EXPORTS_DIR, PDF_OUTPUT_DIR):

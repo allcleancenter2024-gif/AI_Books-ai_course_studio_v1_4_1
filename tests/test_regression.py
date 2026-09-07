@@ -636,3 +636,24 @@ def test_source_summary_is_queued_and_returns_its_result_without_a_long_http_req
         assert job["phase"] == "complete" and job["result"] == expected
     finally:
         delete_source(source["id"])
+
+
+def test_source_summary_rejects_a_saturated_queue_without_spawning_threads(monkeypatch):
+    from fastapi import HTTPException
+    from studio.services import source_service
+
+    source = _insert("file", "대기열 제한 검증", "queue.txt", text="요약 자료")
+    class FullQueue:
+        def acquire(self, blocking=False):
+            return False
+    monkeypatch.setattr(source_service, "_summary_slots", FullQueue())
+    try:
+        try:
+            start_source_summary(source["id"], object(), "lmstudio", "queue-full-test")
+        except HTTPException as exc:
+            assert exc.status_code == 429
+        else:
+            raise AssertionError("포화된 요약 대기열은 요청을 거부해야 합니다")
+        assert jobs.get("queue-full-test") is None
+    finally:
+        delete_source(source["id"])
