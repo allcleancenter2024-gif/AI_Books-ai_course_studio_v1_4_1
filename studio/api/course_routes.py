@@ -11,7 +11,7 @@ from ..auth import require_authenticated
 from ..config import BOOK_EXPORTS_DIR
 from ..db import connect
 from ..multidb import service_record, service_records
-from ..schemas import BookAIRequest, CourseRequest, LessonApprovalRequest, LessonRequest, WeekAIRequest, WeekPartRequest
+from ..schemas import BookAIRequest, CourseRequest, ExternalEditRequest, LessonApprovalRequest, LessonRequest, WeekAIRequest, WeekPartRequest
 from ..services.course_service import create_course
 from ..services.book_change_service import apply_change_to_book, repair_book_integrity
 from ..services.book_export_service import create_hwpx, create_pdf, create_pptx
@@ -19,6 +19,7 @@ from ..services.education_quality import lesson_quality, set_approval
 from ..services.generation_service import build_book, generate_part, start_book_generation
 from ..services.job_status import jobs
 from ..services.lesson_service import student_lesson, teacher_lesson
+from ..services.external_edit import edit_book
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_authenticated)])
 
@@ -69,6 +70,10 @@ def resume_job(job_id: str):
     if payload.get("kind") != "book_generation": raise HTTPException(400, "재개할 수 있는 교재 생성 작업이 아닙니다.")
     if state.get("phase") not in {"cancelled", "error", "interrupted"}: raise HTTPException(409, "현재 상태에서는 작업을 재개할 수 없습니다.")
     return start_book_generation(payload["provider"], payload["weeks"], payload["audience"], payload["start"], payload.get("end"), payload.get("source_ids", []), job_id, payload.get("experience", "처음"), payload.get("device_paths", []), payload.get("edition", "combined"), payload.get("generation_mode", "local_only"), payload.get("web_scope", "disabled"))
+
+@router.post("/external-edit/openai")
+def openai_external_edit(req: ExternalEditRequest):
+    return edit_book(req.book_id, req.instruction, req.consent, req.cost_limit_usd)
 
 @router.get("/books/{book_id}/lessons/{week}/quality")
 def book_lesson_quality(book_id: int, week: int):
