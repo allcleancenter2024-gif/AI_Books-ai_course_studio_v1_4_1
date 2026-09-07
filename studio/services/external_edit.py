@@ -48,7 +48,7 @@ def edit_book(book_id: int, instruction: str, consent: bool, cost_limit_usd: flo
     source = _anonymize(_book_path(book_id).read_text(encoding="utf-8"))
     if len(source) > 120_000:
         source = source[:120_000]
-    prompt = f"편집 지시:\n{instruction}\n\n교재 원문(참고자료):\n{source}"
+    prompt = f"편집 지시:\n{_anonymize(instruction)}\n\n교재 원문(참고자료):\n{source}"
     estimated_input = max(1, (len(prompt) + 3) // 4)
     input_cost = estimated_input / 1000 * input_price
     if input_cost >= cost_limit_usd:
