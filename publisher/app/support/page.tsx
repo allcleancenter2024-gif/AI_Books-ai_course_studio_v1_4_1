@@ -1,0 +1,2 @@
+import Link from 'next/link';
+export default function SupportPage() { return <main className="lesson-shell"><header className="site-header"><Link href="/" className="brand">느린 배움 교재</Link><Link href="/" className="back-link">교재 목록</Link></header><article className="lesson legal"><h1>도움말</h1><p className="lead">교재가 잘 보이지 않거나 글자가 작게 느껴지면 브라우저의 확대 기능을 사용해 보세요.</p><h2>교재 사용 방법</h2><p>교재 목록에서 제목이나 “교재 시작하기”를 누르면 상세 페이지가 열립니다. 상단의 “교재 목록”을 누르면 처음 화면으로 돌아갑니다.</p><h2>문의</h2><p>정식 공개 전에는 운영 문의처가 확정되지 않았습니다. 공개 도메인과 운영 주체가 정해지면 이 페이지에 공식 문의 방법을 게시합니다.</p></article></main>; }

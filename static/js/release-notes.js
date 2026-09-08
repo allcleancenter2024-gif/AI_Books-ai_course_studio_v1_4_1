@@ -1,6 +1,7 @@
 import {esc} from './api.js';
 
 const changeItems = [
+  {group:'제작·발행·운영',feature:'v1.25.0 메뉴 분류와 Publisher 검증',importance:'high',basis:'2026-08-29',changed:'2026-09-08',version:'v1.25.0',before:'제작 설정과 Publisher 이동 메뉴가 빠져 있었으며 HTTPS 문자열만으로 준비 상태를 판정했습니다.',after:'교육 준비·교재 제작·정보 검토·운영 관리·웹 발행으로 메뉴를 분류했습니다. URL 설정과 실제 검증을 구분하고 Markdown 검사와 렌더링이 같은 파서를 사용합니다.'},
   {group:'웹 RAG',feature:'SearXNG 검색·Firecrawl 선택 추출',importance:'high',basis:'2026-08-29',changed:'2026-08-29',version:'v1.24.0',before:'웹 보강은 DuckDuckGo 또는 Tavily 검색과 단일 로컬 HTML 추출기에 의존했습니다.',after:'localhost 전용 SearXNG를 기본 검색으로 사용하고, 고품질 모드에서 A/B 등급 URL만 Firecrawl로 추출합니다. 키·한도·오류 시 Trafilatura 로컬 추출과 내부 RAG로 안전하게 대체합니다.'},
   {group:'실행·안정성',feature:'Windows 실행 파일과 브라우저 상태 갱신',importance:'high',basis:'2026-08-29',changed:'2026-08-29',version:'v1.23.1',before:'실행 파일 이름이 v1.20.2에 머물렀고, EXE는 python.exe만 찾아 일부 Windows 환경에서 시작하지 못했습니다. 하이브리드 상태 UI는 300ms 상시 폴링을 사용했습니다.',after:'v1.23.1 EXE·BAT를 소스 버전과 일치시키고 py.exe와 python.exe를 모두 안전하게 탐색합니다. 상태 UI는 DOM 변경 이벤트 기반으로 갱신해 상시 폴링을 제거했습니다.'},
   {group:'보안·접근',feature:'관리자 로그인과 보호 API',importance:'high',basis:'2026-08-26',changed:'2026-08-27',version:'v1.10.0',before:'화면 접근과 API 호출의 서버 세션 경계가 명확하지 않았습니다.',after:'서버 기반 관리자 로그인, HttpOnly 세션 쿠키, 로그인 실패 제한과 보호 API 라우터를 적용했습니다.'},

@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -40,7 +41,8 @@ def create_app():
 
     @app.exception_handler(Exception)
     async def unhandled(_: Request, exc: Exception):
-        return JSONResponse(status_code=500, content={'detail': f'서버 내부 오류: {type(exc).__name__}: {exc}'})
+        logging.getLogger(__name__).error('Unhandled request error: %s', type(exc).__name__)
+        return JSONResponse(status_code=500, content={'detail': '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.'})
 
     @app.get('/', response_class=HTMLResponse)
     def home():

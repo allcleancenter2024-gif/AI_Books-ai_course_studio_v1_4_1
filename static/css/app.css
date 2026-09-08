@@ -1,3 +1,4 @@
+@import url('./workspace.css');
 :root{
   --bg:#f4f7fb;--surface:#fff;--ink:#142033;--muted:#697586;--line:#dce4ee;
   --primary:#3156d3;--primary-soft:#edf2ff;--success:#18794e;--success-soft:#eaf8f0;

@@ -13,7 +13,7 @@ def system_info():
     """Runtime facts shown in the UI; never expose credentials."""
     return {
         'version': VERSION, 'last_updated': LAST_UPDATED,
-        'changes': 'LM Studio·Ollama 전용 로컬 AI 구조, 상세 설정, 모델 찾기, 서버·모델 자동 연결 기능 적용',
+        'changes': '제작·발행·운영 메뉴 분류, Publisher 준비 상태와 Markdown 검증 보강, 오류 응답 개선',
         'rdbms': RDBMS_NAME, 'role': RDBMS_ROLE,
         'location': str(DB_PATH.parent), 'database_file': DB_PATH.name,
     }

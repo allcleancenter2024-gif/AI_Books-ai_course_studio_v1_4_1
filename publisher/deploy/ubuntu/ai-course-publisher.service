@@ -1,0 +1,22 @@
+[Unit]
+Description=AI Course Studio Publisher
+After=network.target
+
+[Service]
+Type=simple
+User=publisher
+WorkingDirectory=/opt/ai-course-studio/publisher
+Environment=NODE_ENV=production
+Environment=PORT=3010
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/node .next/standalone/server.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/ai-course-studio/publisher
+
+[Install]
+WantedBy=multi-user.target

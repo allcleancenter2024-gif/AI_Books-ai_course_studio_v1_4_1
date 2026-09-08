@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from fastapi.testclient import TestClient
 from studio.application import create_app
-from studio.config import MAX_UPLOAD_BYTES, PDF_OUTPUT_DIR
+from studio.config import MAX_UPLOAD_BYTES, PDF_OUTPUT_DIR, VERSION, LAST_UPDATED
 from studio.services.job_status import jobs
 from studio.services.parsers import parse_file
 from studio.services.source_service import _public_url, _insert, summarize_source, start_source_summary, summary_file, delete_source
@@ -38,7 +38,7 @@ login_client()
 
 def test_health_ui_and_existing_features():
     health = client.get("/api/health")
-    assert health.status_code == 200 and health.json()["version"] == "1.24.0" and health.json()["last_updated"] == "2026-08-29"
+    assert health.status_code == 200 and health.json()["version"] == VERSION and health.json()["last_updated"] == LAST_UPDATED
     runtime = client.get("/api/system-info")
     assert runtime.status_code == 200 and runtime.json()["rdbms"] == "SQLite 3" and runtime.json()["database_file"] == "studio.db"
     page = client.get("/")

@@ -8,8 +8,8 @@ load_dotenv(PROJECT_DIR / ".env", override=False)
 
 # Versioning policy: patch for small fixes (v1.4.1 -> v1.4.2), minor for
 # substantial user-facing changes (v1.4.1 -> v1.5.0).
-VERSION = "1.24.0"
-LAST_UPDATED = "2026-08-29"
+VERSION = "1.25.0"
+LAST_UPDATED = "2026-09-08"
 APP_TITLE = f"AI 강의 활용 Studio v{VERSION} [{LAST_UPDATED}]"
 BASE_DIR = PROJECT_DIR
 # Keep production data in the project by default. Tests and isolated runs can

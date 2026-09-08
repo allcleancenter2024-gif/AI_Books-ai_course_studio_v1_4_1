@@ -1,0 +1,2 @@
+import Link from 'next/link';
+export default function TermsPage() { return <main className="lesson-shell"><header className="site-header"><Link href="/" className="brand">느린 배움 교재</Link><Link href="/" className="back-link">교재 목록</Link></header><article className="lesson legal"><h1>이용약관</h1><p className="lead">이 페이지는 공개 서비스 전 검토를 위한 초안 구조입니다.</p><h2>서비스 범위</h2><p>Publisher는 학습용 웹 교재를 제공하는 발행 계층입니다. Studio의 내부 관리 기능이나 로컬 AI 제공자 기능은 공개 기능에 포함하지 않습니다.</p><h2>콘텐츠 이용</h2><p>교재의 이용 조건과 저작권 안내는 실제 공개 전에 콘텐츠 권리자와 운영자가 확정합니다.</p></article></main>; }
