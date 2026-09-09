@@ -6,7 +6,10 @@ import remarkGfm from 'remark-gfm';
 import { getLesson, getLessons } from '../../../../lib/content';
 
 type Props = { params: Promise<{ courseId: string; lessonId: string }> };
-export const dynamicParams = false;
+// Let unknown routes reach the normal `notFound()` branch.  Keeping this
+// enabled avoids Next.js logging an internal NoFallbackError for an expected
+// 404 while `generateStaticParams` still pre-renders the published lessons.
+export const dynamicParams = true;
 
 export async function generateStaticParams() {
   const lessons = await getLessons();

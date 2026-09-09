@@ -7,25 +7,28 @@ Publisher는 기존 AI Course Studio와 별도 프로세스로 운영합니다. 
 1. `publisher` 폴더만 서버에 배포합니다. `node_modules`, `.next`, `.env`는 복사하지 않습니다.
 2. 서버에서 Node.js LTS를 설치합니다.
 3. `npm.cmd ci`(Windows) 또는 `npm ci`(Ubuntu), `npm run check`, `npm run build`를 순서대로 실행합니다.
-4. 정적 자산을 standalone 출력으로 복사합니다.
+4. 정적 자산을 standalone 출력의 실제 빌드 디렉터리로 복사합니다. 기본값은 `.next`이며, 검증 또는 별도 릴리스에 `PUBLISHER_BUILD_DIR`를 설정했다면 그 값을 사용합니다.
 
 ```powershell
 # Windows PowerShell
-New-Item -ItemType Directory -Force .next\standalone\.next\static | Out-Null
-Get-ChildItem -Force .next\static | Copy-Item -Recurse -Force -Destination .next\standalone\.next\static
+$BuildDirectory = if ($env:PUBLISHER_BUILD_DIR) { $env:PUBLISHER_BUILD_DIR } else { '.next' }
+$StandaloneDirectory = Join-Path $BuildDirectory 'standalone'
+New-Item -ItemType Directory -Force (Join-Path $StandaloneDirectory "$BuildDirectory\static") | Out-Null
+Get-ChildItem -Force (Join-Path $BuildDirectory 'static') | Copy-Item -Recurse -Force -Destination (Join-Path $StandaloneDirectory "$BuildDirectory\static")
 if (Test-Path public) {
-  New-Item -ItemType Directory -Force .next\standalone\public | Out-Null
-  Get-ChildItem -Force public | Copy-Item -Recurse -Force -Destination .next\standalone\public
+  New-Item -ItemType Directory -Force (Join-Path $StandaloneDirectory 'public') | Out-Null
+  Get-ChildItem -Force public | Copy-Item -Recurse -Force -Destination (Join-Path $StandaloneDirectory 'public')
 }
 ```
 
 ```bash
 # Ubuntu
-mkdir -p .next/standalone/.next/static
-cp -R .next/static/. .next/standalone/.next/static/
+BUILD_DIRECTORY="${PUBLISHER_BUILD_DIR:-.next}"
+mkdir -p "$BUILD_DIRECTORY/standalone/$BUILD_DIRECTORY/static"
+cp -R "$BUILD_DIRECTORY/static/." "$BUILD_DIRECTORY/standalone/$BUILD_DIRECTORY/static/"
 if [ -d public ]; then
-  mkdir -p .next/standalone/public
-  cp -R public/. .next/standalone/public/
+  mkdir -p "$BUILD_DIRECTORY/standalone/public"
+  cp -R public/. "$BUILD_DIRECTORY/standalone/public/"
 fi
 ```
 

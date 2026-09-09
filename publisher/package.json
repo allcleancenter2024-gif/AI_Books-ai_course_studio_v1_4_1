@@ -1,6 +1,6 @@
 {
   "name": "ai-course-studio-publisher",
-  "version": "1.25.0",
+  "version": "1.26.2",
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --port 3010",
