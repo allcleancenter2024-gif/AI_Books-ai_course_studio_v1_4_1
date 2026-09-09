@@ -1,6 +1,9 @@
 import {esc} from './api.js';
 
 const changeItems = [
+  {group:'교육 데이터·발행',feature:'주차 독립 Lesson Unit·Publisher handoff',importance:'high',basis:'2026-09-08',changed:'2026-09-09',version:'Phase 10',before:'전체 교재 결과를 파일 중심으로만 확인해야 했고 학생용·강사용 차시 데이터를 Publisher가 독립 조회하기 어려웠습니다.',after:'주차별 Lesson Unit 조회 API가 학생용·강사용·통합 콘텐츠와 품질·승인·출처 메타데이터를 함께 반환합니다. 승인 전 발행 필요 상태도 명시합니다.'},
+  {group:'자료 처리·교육 품질',feature:'체크섬·멱등 업로드와 품질 게이트',importance:'high',basis:'2026-08-29',changed:'2026-09-07',version:'Phase 4·8',before:'대용량 업로드 재시도와 출판 전 품질 상태가 화면에서 충분히 구분되지 않았습니다.',after:'업로드 원본 크기·SHA-256·멱등 키를 기록하고 검증된 작업만 재개합니다. 품질 검사 실패 또는 강사 승인 전 차시는 발행을 차단합니다.'},
+  {group:'학습자 경험',feature:'학습자 프로필·기기별 안내',importance:'medium',basis:'2026-09-08',changed:'2026-09-09',version:'Phase 9',before:'대상·디지털 경험·기기 설정이 생성 화면에 분산되어 기기별 절차를 한눈에 확인하기 어려웠습니다.',after:'교육 제작 설정에서 대상·경험·기기를 지정하고 선택 기기별 조작 안내와 PC 웹 fallback을 즉시 확인합니다.'},
   {group:'제작·발행·운영',feature:'v1.25.0 메뉴 분류와 Publisher 검증',importance:'high',basis:'2026-08-29',changed:'2026-09-08',version:'v1.25.0',before:'제작 설정과 Publisher 이동 메뉴가 빠져 있었으며 HTTPS 문자열만으로 준비 상태를 판정했습니다.',after:'교육 준비·교재 제작·정보 검토·운영 관리·웹 발행으로 메뉴를 분류했습니다. URL 설정과 실제 검증을 구분하고 Markdown 검사와 렌더링이 같은 파서를 사용합니다.'},
   {group:'웹 RAG',feature:'SearXNG 검색·Firecrawl 선택 추출',importance:'high',basis:'2026-08-29',changed:'2026-08-29',version:'v1.24.0',before:'웹 보강은 DuckDuckGo 또는 Tavily 검색과 단일 로컬 HTML 추출기에 의존했습니다.',after:'localhost 전용 SearXNG를 기본 검색으로 사용하고, 고품질 모드에서 A/B 등급 URL만 Firecrawl로 추출합니다. 키·한도·오류 시 Trafilatura 로컬 추출과 내부 RAG로 안전하게 대체합니다.'},
   {group:'실행·안정성',feature:'Windows 실행 파일과 브라우저 상태 갱신',importance:'high',basis:'2026-08-29',changed:'2026-08-29',version:'v1.23.1',before:'실행 파일 이름이 v1.20.2에 머물렀고, EXE는 python.exe만 찾아 일부 Windows 환경에서 시작하지 못했습니다. 하이브리드 상태 UI는 300ms 상시 폴링을 사용했습니다.',after:'v1.23.1 EXE·BAT를 소스 버전과 일치시키고 py.exe와 python.exe를 모두 안전하게 탐색합니다. 상태 UI는 DOM 변경 이벤트 기반으로 갱신해 상시 폴링을 제거했습니다.'},

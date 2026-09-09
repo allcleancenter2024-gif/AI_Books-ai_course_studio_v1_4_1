@@ -1,4 +1,5 @@
 from studio.services.education_quality import enrich_lesson, load_lesson_unit, quality_report, save_lesson_unit
+from studio.db import init_db
 
 
 def _lesson():
@@ -28,6 +29,7 @@ def test_quality_report_blocks_student_teacher_objective_mismatch():
 
 
 def test_lesson_unit_round_trips_as_independent_record():
+    init_db()
     lesson = enrich_lesson(_lesson(), {"audience": "성인", "experience": "처음", "device_paths": ["pc_web"]}, "AI 연습", [12])
     lesson["week"] = 3
     profile = {"audience": "성인", "experience": "처음", "device_paths": ["pc_web"], "source_ids": [12]}
