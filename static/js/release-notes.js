@@ -1,6 +1,7 @@
 import {esc} from './api.js';
 
 const changeItems = [
+  {group:'교육 데이터·발행',feature:'검토형 이미지 자산·반응형 출판 미리보기',importance:'high',basis:'2026-09-09',changed:'2026-09-09',version:'v1.26.0',before:'주차 교재에는 이미지 자산·한글/영문 프롬프트·기기별 검토 화면을 별도 안전 경계로 관리하는 구조가 없었습니다.',after:'이미지는 로컬 AssetStorage에만 저장하고 SQLite에는 검증 메타데이터만 보관합니다. 학생/강사·PC/Tablet/Mobile 미리보기, ALT·저작권·Prompt 체크리스트와 승인된 Publication Snapshot 게이트를 제공합니다.'},
   {group:'교육 데이터·발행',feature:'주차 독립 Lesson Unit·Publisher handoff',importance:'high',basis:'2026-09-08',changed:'2026-09-09',version:'Phase 10',before:'전체 교재 결과를 파일 중심으로만 확인해야 했고 학생용·강사용 차시 데이터를 Publisher가 독립 조회하기 어려웠습니다.',after:'주차별 Lesson Unit 조회 API가 학생용·강사용·통합 콘텐츠와 품질·승인·출처 메타데이터를 함께 반환합니다. 승인 전 발행 필요 상태도 명시합니다.'},
   {group:'자료 처리·교육 품질',feature:'체크섬·멱등 업로드와 품질 게이트',importance:'high',basis:'2026-08-29',changed:'2026-09-07',version:'Phase 4·8',before:'대용량 업로드 재시도와 출판 전 품질 상태가 화면에서 충분히 구분되지 않았습니다.',after:'업로드 원본 크기·SHA-256·멱등 키를 기록하고 검증된 작업만 재개합니다. 품질 검사 실패 또는 강사 승인 전 차시는 발행을 차단합니다.'},
   {group:'학습자 경험',feature:'학습자 프로필·기기별 안내',importance:'medium',basis:'2026-09-08',changed:'2026-09-09',version:'Phase 9',before:'대상·디지털 경험·기기 설정이 생성 화면에 분산되어 기기별 절차를 한눈에 확인하기 어려웠습니다.',after:'교육 제작 설정에서 대상·경험·기기를 지정하고 선택 기기별 조작 안내와 PC 웹 fallback을 즉시 확인합니다.'},

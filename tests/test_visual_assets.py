@@ -30,6 +30,12 @@ def _png_upload() -> UploadFile:
     return UploadFile(file=data, filename="lesson.png", headers=Headers({"content-type": "image/png"}))
 
 
+def _png_with_wrong_extension() -> UploadFile:
+    upload = _png_upload()
+    upload.filename = "lesson.jpg"
+    return upload
+
+
 def test_prompt_draft_and_local_image_asset_are_optional_and_gate_publication():
     book_id, week = 9921, 1
     _seed_lesson(book_id, week)
@@ -47,6 +53,8 @@ def test_prompt_draft_and_local_image_asset_are_optional_and_gate_publication():
     with pytest.raises(HTTPException, match="이미지가 있는 차시"):
         publication_snapshot(book_id, week)
     remove_asset(asset["id"])
+    with pytest.raises(HTTPException, match="확장자"):
+        asyncio.run(add_uploaded_asset(book_id, week, _png_with_wrong_extension(), {"role": "hero", "alt_text_ko": "AI 학습 장면", "alt_text_en": "", "caption_ko": "", "caption_en": "", "source_type": "uploaded", "source_url": "", "creator": "", "license": "", "copyright_status": "review_required"}))
     with connect() as conn:
         conn.execute("DELETE FROM lesson_units WHERE book_id=?", (book_id,))
         conn.execute("DELETE FROM books WHERE id=?", (book_id,))

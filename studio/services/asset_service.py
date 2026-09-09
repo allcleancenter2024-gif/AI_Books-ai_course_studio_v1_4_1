@@ -126,6 +126,9 @@ async def add_uploaded_asset(book_id: int, week: int, upload: UploadFile, metada
     if image_format not in ALLOWED_IMAGE_TYPES or width < 1 or height < 1 or width * height > 30_000_000:
         raise HTTPException(415, "JPG, PNG, WEBP 형식과 안전한 이미지 크기만 지원합니다.")
     mime_type, extension = ALLOWED_IMAGE_TYPES[image_format]
+    allowed_suffixes = {"JPEG": {".jpg", ".jpeg"}, "PNG": {".png"}, "WEBP": {".webp"}}[image_format]
+    if Path(upload.filename or "").suffix.lower() not in allowed_suffixes:
+        raise HTTPException(415, "파일 확장자와 실제 이미지 형식이 일치하지 않습니다.")
     declared = (upload.content_type or "").lower()
     if declared and declared not in {mime_type, "application/octet-stream"}:
         raise HTTPException(415, "파일 확장자와 MIME 유형이 일치하지 않습니다.")
