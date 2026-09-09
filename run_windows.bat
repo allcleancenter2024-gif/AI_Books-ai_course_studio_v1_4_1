@@ -1,9 +1,9 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
-title AI Course Studio v1.26.2 - Secure Launcher
+title AI Course Studio v1.26.3 - Secure Launcher
 cd /d "%~dp0"
 echo.
-echo AI Course Studio v1.26.2 - secure local launcher
+echo AI Course Studio v1.26.3 - secure local launcher
 echo HWPX, PPTX, PDF export support enabled.
 echo The browser will open after the server is ready.
 echo Sign in on the Studio opening screen.

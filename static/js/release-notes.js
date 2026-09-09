@@ -1,6 +1,7 @@
 import {esc} from './api.js';
 
 const changeItems = [
+  {group:'Publisher 운영',feature:'미리보기·출판 오류 복구 안내',importance:'high',basis:'2026-09-10',changed:'2026-09-10',version:'v1.26.3',before:'교재·주차·시각 자산 조회가 실패하거나 응답이 멈추면 로딩 문구만 남아 실제 원인과 복구 방법을 알기 어려웠습니다.',after:'미리보기 API는 12초 안에 응답하지 않으면 중단하고, 오류 원인·점검 안내·다시 시도 버튼을 같은 화면에 표시합니다. 실패 뒤에도 로딩 상태를 즉시 해제합니다.'},
   {group:'Publisher 운영',feature:'없는 교재 주소의 404·standalone 정적 자산 안정화',importance:'high',basis:'2026-09-10',changed:'2026-09-10',version:'v1.26.2',before:'정적으로 생성되지 않은 교재 주소는 사용자에게 404를 반환해도 서버에 내부 fallback 오류가 기록될 수 있었고, 사용자 지정 빌드 폴더를 standalone으로 패키징할 때 JS·CSS 자산 경로를 별도로 확인해야 했습니다.',after:'없는 교재는 기존 notFound 처리로 일관되게 404를 반환하며 내부 fallback 오류를 남기지 않습니다. standalone 릴리스는 실제 distDir의 정적 자산까지 포함해 페이지와 JS·CSS 응답을 함께 검증합니다.'},
   {group:'Publisher 운영',feature:'교재 자동 선택·최근 상태 복원 최적화',importance:'high',basis:'2026-09-10',changed:'2026-09-10',version:'v1.26.1',before:'Publisher 진입 시 교재·주차 상태를 다시 선택하거나 내부 ID를 확인해야 했습니다.',after:'현재 교재·주차를 URL과 최근 작업 상태에서 안전하게 복원하고 단계별 미리보기 로딩 상태를 표시합니다.'},
   {group:'교육 데이터·발행',feature:'검토형 이미지 자산·반응형 출판 미리보기',importance:'high',basis:'2026-09-09',changed:'2026-09-09',version:'v1.26.0',before:'주차 교재에는 이미지 자산·한글/영문 프롬프트·기기별 검토 화면을 별도 안전 경계로 관리하는 구조가 없었습니다.',after:'이미지는 로컬 AssetStorage에만 저장하고 SQLite에는 검증 메타데이터만 보관합니다. 학생/강사·PC/Tablet/Mobile 미리보기, ALT·저작권·Prompt 체크리스트와 승인된 Publication Snapshot 게이트를 제공합니다.'},

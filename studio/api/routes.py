@@ -15,7 +15,7 @@ def system_info():
     """Runtime facts shown in the UI; never expose credentials."""
     return {
         'version': VERSION, 'last_updated': LAST_UPDATED,
-        'changes': 'Publisher 없는 교재 주소의 정상 404 처리·standalone 정적 자산 배포 검증 보강',
+        'changes': '미리보기·출판 오류 안내·12초 응답 제한·다시 시도 처리 보강',
         'rdbms': RDBMS_NAME, 'role': RDBMS_ROLE,
         'location': str(DB_PATH.parent), 'database_file': DB_PATH.name,
     }
