@@ -37,6 +37,7 @@ APP_PORT = _bounded_int("APP_PORT", 8765, 1, 65535)
 APP_BASE_URL = f"http://{APP_HOST}:{APP_PORT}"
 PUBLIC_ACCESS = _env_flag("PUBLIC_ACCESS", False)
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").strip()
+AUDIT_SAFE_MODE = _env_flag("AI_COURSE_STUDIO_AUDIT_SAFE_MODE", False)
 
 # SQLite remains the authoritative Studio store in this release.  The Docker
 # PostgreSQL/MongoDB stack is optional replication/integration infrastructure,
@@ -102,6 +103,7 @@ def configuration_summary() -> dict[str, object]:
         "app_port": APP_PORT,
         "app_base_url": APP_BASE_URL,
         "public_access": PUBLIC_ACCESS,
+        "audit_safe_mode": AUDIT_SAFE_MODE,
         "runtime_dir": str(RUNTIME_DIR),
         "data_store_role": DATA_STORE_ROLE,
         "max_upload_bytes": MAX_UPLOAD_BYTES,

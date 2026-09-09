@@ -29,3 +29,6 @@ class ProviderService:
         if provider:
             return self._manager.health_snapshot(provider)
         return [{"name": name, **self._manager.health_snapshot(name)} for name in ("lmstudio", "ollama")]
+
+    def probe_health(self, provider: str) -> dict[str, Any]:
+        return self._manager.probe_health(provider)

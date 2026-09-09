@@ -26,3 +26,4 @@ _internal/
 providers/*
 !providers/__init__.py
 !providers/engine.py
+!providers/errors.py

@@ -8,12 +8,22 @@ import re
 import time
 import base64
 import mimetypes
+import logging
 from pathlib import Path
 from threading import RLock, Thread
 
 import httpx
+from .errors import (
+    ProviderCancelledError,
+    ProviderCapabilityError,
+    ProviderError,
+    ProviderExecutionBlockedError,
+    ProviderModelNotFoundError,
+    ProviderTimeoutError,
+    ProviderUnavailableError,
+)
 from studio.config import (LMSTUDIO_BASE_URL, LMSTUDIO_ENABLED, LMSTUDIO_TIMEOUT_SECONDS,
-                           OLLAMA_BASE_URL, OLLAMA_ENABLED, OLLAMA_TIMEOUT_SECONDS)
+                           OLLAMA_BASE_URL, OLLAMA_ENABLED, OLLAMA_TIMEOUT_SECONDS, AUDIT_SAFE_MODE)
 
 
 @dataclass
@@ -33,6 +43,17 @@ class ProviderConfig:
 
 
 LOCAL_PROVIDERS = ("lmstudio", "ollama")
+_logger = logging.getLogger("ai_course_studio.provider")
+
+
+def _provider_event(event: str, provider: str, operation: str, *, status: str = "", attempt: int = 0, duration_ms: int | None = None, error_code: str = "") -> None:
+    """Allowlist-only provider diagnostics; never include prompts or credentials."""
+    fields = {"event": event, "provider": provider, "operation": operation, "status": status, "attempt": attempt}
+    if duration_ms is not None:
+        fields["duration_ms"] = duration_ms
+    if error_code:
+        fields["normalized_error_code"] = error_code
+    _logger.info("provider_event %s", fields)
 
 # Conservative, implementation-backed capability declarations.  A capability
 # is advertised only when the gateway has a supported code path for it;
@@ -65,10 +86,6 @@ DEFAULTS: dict[str, ProviderConfig] = {
 }
 
 
-class ProviderError(RuntimeError):
-    pass
-
-
 class ProviderManager:
     """One interface for the two supported local AI runtimes."""
 
@@ -78,6 +95,8 @@ class ProviderManager:
         self._failover_events: list[dict[str, str]] = []
 
     def get(self, name: str) -> ProviderConfig:
+        if AUDIT_SAFE_MODE:
+            raise ProviderExecutionBlockedError("Audit Safe Mode에서는 Provider 실행이 차단됩니다.")
         if name not in self.configs:
             raise ProviderError(f"지원하지 않는 Provider입니다: {name}")
         if not self.enabled(name):
@@ -112,6 +131,28 @@ class ProviderManager:
         else:
             status = "degraded"
         return {"enabled": enabled, "status": status, "capabilities": self.capabilities(name)}
+
+    def probe_health(self, name: str, timeout_seconds: float = 3.0) -> dict[str, Any]:
+        """Perform an optional, bounded live probe; never blocks application startup."""
+        snapshot = self.health_snapshot(name)
+        if snapshot["status"] == "disabled":
+            return {**snapshot, "probe": "skipped"}
+        cfg = self.get(name)
+        started = time.monotonic()
+        try:
+            response = httpx.get(
+                cfg.base_url.rstrip("/") + "/models",
+                headers={"Authorization": f"Bearer {self._key(cfg) or 'local'}"},
+                timeout=httpx.Timeout(max(0.5, min(float(timeout_seconds), 10.0))),
+            )
+            response.raise_for_status()
+            data = response.json()
+            models = data.get("data", []) if isinstance(data, dict) else []
+            return {**snapshot, "status": "healthy", "probe": "ok", "model_count": len(models), "duration_ms": int((time.monotonic() - started) * 1000)}
+        except httpx.TimeoutException:
+            return {**snapshot, "status": "unavailable", "probe": "timeout", "duration_ms": int((time.monotonic() - started) * 1000)}
+        except (httpx.HTTPError, ValueError):
+            return {**snapshot, "status": "unavailable", "probe": "error", "duration_ms": int((time.monotonic() - started) * 1000)}
 
     def configure(
         self,
@@ -346,25 +387,31 @@ class ProviderManager:
         """Retry only failures that are normally transient, never auth/validation errors."""
         last_error: Exception | None = None
         for attempt in range(3):
+            _provider_event("provider_request_started", label, "json_post", attempt=attempt + 1)
             try:
                 with httpx.Client(timeout=timeout) as client:
                     response = client.post(url, headers=headers, json=body)
                 if response.status_code in (408, 409, 429, 500, 502, 503, 504):
                     last_error = ProviderError(f"{label} API 일시 오류 ({response.status_code})")
                     if attempt < 2:
+                        _provider_event("provider_retry", label, "json_post", status=str(response.status_code), attempt=attempt + 1, error_code="temporary_http_error")
                         time.sleep(self._retry_delay(attempt))
                         continue
                 self._raise(response, label)
                 data = response.json()
                 if isinstance(data, dict):
+                    _provider_event("provider_request_completed", label, "json_post", status="ok", attempt=attempt + 1)
                     return data
                 raise ProviderError(f"{label} API가 JSON 객체가 아닌 응답을 반환했습니다.")
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
                 last_error = exc
                 if attempt < 2:
+                    _provider_event("provider_retry", label, "json_post", attempt=attempt + 1, error_code="timeout" if isinstance(exc, httpx.TimeoutException) else "network_error")
                     time.sleep(self._retry_delay(attempt))
                     continue
-                raise ProviderError(f"{label} 연결이 반복해서 시간초과되거나 끊겼습니다. 잠시 후 다시 시도하세요.") from exc
+                if isinstance(exc, httpx.TimeoutException):
+                    raise ProviderTimeoutError(f"{label} 응답 시간이 초과되었습니다. 잠시 후 다시 시도하세요.") from exc
+                raise ProviderUnavailableError(f"{label} 연결이 반복해서 끊겼습니다. 잠시 후 다시 시도하세요.") from exc
         raise ProviderError(f"{label} API가 일시 오류 후 복구되지 않았습니다. 잠시 후 다시 시도하세요.") from last_error
 
     @staticmethod

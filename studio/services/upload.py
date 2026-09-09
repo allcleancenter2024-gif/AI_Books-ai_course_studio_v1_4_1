@@ -56,7 +56,18 @@ def parse_staged_upload(name: str, destination: Path, size: int, ext: str, mime:
         # extracted text and metadata in SQLite instead of retaining a second copy.
         meta.update(original_retained=False, storage_note="원본 파일은 분석 후 제거되고 텍스트·메타데이터·벡터만 DB에 저장됩니다.")
         result = insert(kind, name, name, "", mime, "", text, meta, "ready" if text else "needs_review")
-        jobs.update(job_id, phase="complete", message="업로드와 분석 완료", progress=100, bytes_done=size, bytes_total=size)
+        # Publish terminal state and its consumer-facing result together.
+        # A separate completion update creates a race where a polling browser
+        # can observe ``complete`` before it can read the new source ID.
+        jobs.update(
+            job_id,
+            phase="complete",
+            message="업로드와 분석 완료",
+            progress=100,
+            bytes_done=size,
+            bytes_total=size,
+            result={"source_id": result["id"]},
+        )
         return result
     except Exception as exc:
         if not jobs.is_cancelled(job_id):
