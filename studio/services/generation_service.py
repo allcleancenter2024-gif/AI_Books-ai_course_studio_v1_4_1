@@ -4,13 +4,12 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import RLock, Thread
 import json
-import os
 import re
 from fastapi import HTTPException
 from providers.engine import ProviderManager, ProviderError, extract_json
 from generators.course_content import SYSTEM_PROMPT, book_to_markdown
 from generators.staged_content import lesson_part_prompt,prompts_part_prompt,exercises_part_prompt,prompt_item_prompt,exercise_item_prompt
-from ..config import LOGS_DIR, BOOK_EXPORTS_DIR
+from ..config import LOGS_DIR, BOOK_EXPORTS_DIR, LMSTUDIO_MAX_PARALLEL_CALLS
 from ..multidb import upsert_service, next_service_id
 from .course_service import course_source
 from .lesson_service import student_lesson, teacher_lesson
@@ -35,11 +34,6 @@ LOCAL_OUTPUT_TOKENS={"lesson":1000,"prompts":800,"exercises":1200}
 LOCAL_REFERENCE_CHARS = 6_000
 REMOTE_REFERENCE_CHARS = 18_000
 WEB_EVIDENCE_MAX_CHARS = 3_000
-try:
-    LMSTUDIO_MAX_PARALLEL_CALLS = max(1, min(int(os.getenv("AI_COURSE_STUDIO_LMSTUDIO_PARALLELISM", "1")), 2))
-except ValueError:
-    LMSTUDIO_MAX_PARALLEL_CALLS = 1
-
 _EMBEDDED_FIELD = re.compile(r'^\s*["{\[]?\s*(reason|expected_result|verification|task|title)\s*["\']?\s*:\s*["\']?\s*(.*?)\s*["\'}\]]?\s*$', re.I)
 
 def sanitize_exercises(items: list[dict] | object, topic: str, practice: str) -> list[dict]:
@@ -299,7 +293,7 @@ def build_week(provider,weeks,week,audience,source_ids=None,on_stage=None,experi
     e.pop('_provider_error_kind',None)
     topic, practice = course_source(weeks)[week-1]
     lesson={"week":week,"topic":l.get('topic',''),"student":l.get('student',{}),"teacher":l.get('teacher',{}),"prompt_examples":p.get('prompt_examples',[]),"exercises":sanitize_exercises(e.get('exercises',[]), topic, practice),"review":l.get('review',{}),"latest_changes":l.get('_latest_changes',lesson_change_notes()),"_meta":l.get('_meta',{}),"evidence_pack_id":l.get('_evidence_pack_id'),"_warnings":[x.get('_warning') for x in (l,p,e) if isinstance(x,dict) and x.get('_warning')]}
-    return enrich_lesson(lesson, learner_profile(audience, experience, device_paths), course_source(weeks)[week-1][1])
+    return enrich_lesson(lesson, learner_profile(audience, experience, device_paths), course_source(weeks)[week-1][1], source_ids)
 
 def build_book(provider,weeks,audience,start,end=None,source_ids=None,job_id='',experience='처음',device_paths=None,edition='combined',generation_mode='local_only',web_scope='disabled'):
     end=end or weeks

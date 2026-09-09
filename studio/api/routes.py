@@ -4,9 +4,11 @@ from ..config import VERSION, LAST_UPDATED, DB_PATH, RDBMS_NAME, RDBMS_ROLE
 from ..data.catalog import TOPICS
 from ..auth import require_authenticated
 from ..services.generation_service import providers
+from ..services.provider_service import ProviderService
 from ..services.latest_info_service import product_rows
 
 router=APIRouter(prefix='/api', dependencies=[Depends(require_authenticated)])
+provider_service = ProviderService(providers)
 
 @router.get('/system-info')
 def system_info():
@@ -21,7 +23,7 @@ def system_info():
 @router.get('/status')
 def status():
     ps=providers.list_public()
-    return {'server':'online','version':VERSION,'last_updated':LAST_UPDATED,'providers':[{'name':p['name'],'model':p['model'],'configured':bool(p.get('has_key'))} for p in ps]}
+    return {'server':'online','version':VERSION,'last_updated':LAST_UPDATED,'providers':[{'name':p['name'],'model':p['model'],'configured':bool(p.get('has_key')),'enabled':p.get('enabled', False),'status':p.get('status', 'unknown'),'capabilities':p.get('capabilities', {})} for p in ps]}
 
 @router.get('/topics')
 def topics(): return [{'name':n,'description':d} for n,d in TOPICS]

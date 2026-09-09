@@ -16,6 +16,7 @@ from urllib.robotparser import RobotFileParser
 
 import httpx
 from bs4 import BeautifulSoup
+from ..config import web_search_configuration
 
 USER_AGENT = "AI-Course-Studio-Hybrid-RAG/1.23"
 RETRYABLE_FIRECRAWL = {408, 429, 500, 502, 503, 504}
@@ -26,11 +27,7 @@ _SEARCH_SLOT = threading.BoundedSemaphore(1)
 
 
 def _search_cache_limit() -> int:
-    try:
-        requested = int(os.getenv("SEARXNG_CACHE_MAX_ENTRIES", "256"))
-    except ValueError:
-        requested = 256
-    return max(16, min(requested, 1024))
+    return int(web_search_configuration()["cache_max_entries"])
 
 
 @dataclass(frozen=True)
@@ -409,9 +406,16 @@ def extract_public_page(url: str, timeout: float = 15.0, max_bytes: int = 8 * 10
 
 
 def build_search_provider(high_quality: bool = False) -> WebSearchProvider:
-    selected = os.getenv("AI_COURSE_STUDIO_WEB_SEARCH_PROVIDER", "searxng").lower()
-    timeout = float(os.getenv("SEARXNG_TIMEOUT_SECONDS", os.getenv("AI_COURSE_STUDIO_WEB_SEARCH_TIMEOUT", "15")))
-    local = LocalContentExtractor(float(os.getenv("LOCAL_WEB_EXTRACTOR_TIMEOUT_SECONDS", str(timeout))), int(os.getenv("LOCAL_WEB_EXTRACTOR_MAX_BYTES", str(8 * 1024 * 1024))), int(os.getenv("LOCAL_WEB_EXTRACTOR_MAX_TEXT_CHARS", "120000")))
+    settings = web_search_configuration()
+    if not settings["enabled"]:
+        return DisabledSearchProvider()
+    selected = str(settings["provider"])
+    timeout = float(settings["timeout_seconds"])
+    local = LocalContentExtractor(
+        float(settings["extractor_timeout_seconds"]),
+        int(settings["extractor_max_bytes"]),
+        int(settings["extractor_max_text_chars"]),
+    )
     firecrawl = FirecrawlProvider(os.getenv("FIRECRAWL_API_KEY", ""), float(os.getenv("FIRECRAWL_TIMEOUT_SECONDS", "30")), int(os.getenv("FIRECRAWL_MAX_RETRIES", "1")))
     if selected == "disabled":
         return DisabledSearchProvider()

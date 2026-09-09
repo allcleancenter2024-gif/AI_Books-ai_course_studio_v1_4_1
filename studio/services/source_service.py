@@ -8,6 +8,7 @@ import threading
 import uuid
 import zipfile
 import hashlib
+import time
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote, urlparse
@@ -17,10 +18,12 @@ from bs4 import BeautifulSoup
 from fastapi import HTTPException, UploadFile
 from .source_context import build_source_context
 from .summarization import summarize_text
-from .upload import receive_and_parse
+from .upload import parse_staged_upload, sha256_file, stage_upload
 from .vector_index import index_source
 
-from ..config import SOURCE_PACKS_DIR, SUMMARY_EXPORTS_DIR, SUMMARY_MAX_CONCURRENT, SUMMARY_QUEUE_LIMIT
+from ..config import (SOURCE_PACKS_DIR, SUMMARY_EXPORTS_DIR, SUMMARY_MAX_CONCURRENT, SUMMARY_QUEUE_LIMIT,
+                      UPLOAD_PARSE_MAX_CONCURRENT, UPLOAD_PARSE_QUEUE_LIMIT, UPLOAD_STAGING_RETENTION_SECONDS,
+                      UPLOADS_DIR)
 from ..db import connect
 from ..multidb import mirror_source, delete_source as delete_source_mirror, source_record, source_records, create_source_record, update_source_record
 from .job_status import jobs
@@ -34,6 +37,9 @@ _active_summary_jobs: dict[int, str] = {}
 # saturated queue is rejected immediately instead of creating unbounded
 # threads or leaving an HTTP request waiting indefinitely.
 _summary_slots = threading.BoundedSemaphore(SUMMARY_MAX_CONCURRENT + SUMMARY_QUEUE_LIMIT)
+_upload_job_lock = threading.RLock()
+_active_upload_jobs: set[str] = set()
+_upload_parse_slots = threading.BoundedSemaphore(UPLOAD_PARSE_MAX_CONCURRENT + UPLOAD_PARSE_QUEUE_LIMIT)
 
 
 def _now() -> str:
@@ -119,8 +125,119 @@ def _insert(kind,title,original_name='',url='',mime_type='',local_path='',text='
     return row
 
 
-def save_upload(file: UploadFile, job_id: str, declared_size: int = 0) -> dict:
-    return receive_and_parse(file, job_id, declared_size, _insert)
+def _cleanup_expired_upload_staging() -> None:
+    cutoff = time.time() - UPLOAD_STAGING_RETENTION_SECONDS
+    for path in UPLOADS_DIR.iterdir():
+        try:
+            if path.is_file() and path.stat().st_mtime < cutoff:
+                path.unlink(missing_ok=True)
+        except OSError:
+            continue
+
+
+def _existing_upload(idempotency_key: str, checksum: str, size: int) -> dict | None:
+    for row in source_records() or []:
+        try:
+            metadata = row.get('metadata') or json.loads(row.get('metadata_json') or '{}')
+        except (TypeError, json.JSONDecodeError):
+            metadata = {}
+        if (metadata.get('upload_idempotency_key') == idempotency_key
+                and metadata.get('upload_checksum') == checksum
+                and int(metadata.get('upload_size', -1)) == size):
+            return row
+    return None
+
+
+def _insert_uploaded(*args, checksum: str, size: int, idempotency_key: str):
+    kind, title, original_name, url, mime, local_path, text, meta, status = args
+    meta = {**(meta or {}), 'upload_checksum': checksum, 'upload_size': size,
+            'upload_idempotency_key': idempotency_key}
+    return _insert(kind, title, original_name, url, mime, local_path, text, meta, status)
+
+
+def save_upload(file: UploadFile, job_id: str, declared_size: int = 0, idempotency_key: str = '') -> dict:
+    """Accept the file synchronously, then parse/index it in a bounded worker."""
+    _cleanup_expired_upload_staging()
+    requested_id = job_id or str(uuid.uuid4())
+    idempotency_key = re.sub(r'[^0-9A-Za-z._:-]+', '_', idempotency_key.strip())[:160] or requested_id
+    if not _upload_parse_slots.acquire(blocking=False):
+        raise HTTPException(429, '업로드 분석 대기열이 가득 찼습니다. 현재 작업이 끝난 뒤 다시 시도하세요.')
+    try:
+        name, destination, size, ext, mime = stage_upload(file, requested_id, declared_size)
+        checksum = sha256_file(destination)
+        with _upload_job_lock:
+            _active_upload_jobs.add(requested_id)
+        jobs.update(requested_id, phase='queued', message='업로드 분석 작업을 대기열에 추가했습니다.', progress=56,
+                    bytes_done=size, bytes_total=size, error='', result=None,
+                    payload={'kind': 'source_upload', 'filename': name, 'staged_name': destination.name,
+                             'size': size, 'checksum': checksum, 'extension': ext, 'mime': mime,
+                             'idempotency_key': idempotency_key})
+    except Exception:
+        _upload_parse_slots.release()
+        raise
+
+    def run() -> None:
+        try:
+            existing = _existing_upload(idempotency_key, checksum, size)
+            if existing is not None:
+                jobs.update(requested_id, phase='complete', message='동일 파일 재시도를 기존 자료에 연결했습니다.', progress=100,
+                            result={'source_id': existing.get('id')})
+                return
+            result = parse_staged_upload(name, destination, size, ext, mime, requested_id,
+                                         lambda *args: _insert_uploaded(*args, checksum=checksum, size=size, idempotency_key=idempotency_key))
+            if result is not None and not jobs.is_cancelled(requested_id):
+                jobs.update(requested_id, phase='complete', message='업로드와 분석 완료', progress=100, result={'source_id': result['id']})
+        except Exception:
+            # parse_staged_upload stores the public error detail and always
+            # removes the staged original; the worker itself remains alive.
+            pass
+        finally:
+            _upload_parse_slots.release()
+            with _upload_job_lock:
+                _active_upload_jobs.discard(requested_id)
+
+    try:
+        threading.Thread(target=run, name=f'source-upload-{requested_id[:16]}', daemon=True).start()
+    except Exception:
+        destination.unlink(missing_ok=True)
+        _upload_parse_slots.release()
+        with _upload_job_lock:
+            _active_upload_jobs.discard(requested_id)
+        raise
+    return {'job_id': requested_id, 'accepted': True, 'already_running': False, 'phase': 'queued'}
+
+
+def resume_source_upload(job_id: str) -> dict:
+    state = jobs.get(job_id)
+    payload = (state or {}).get('payload') or {}
+    if not state or payload.get('kind') != 'source_upload':
+        raise HTTPException(400, '재개할 수 있는 업로드 작업이 아닙니다.')
+    if state.get('phase') not in {'interrupted', 'error', 'cancelled'}:
+        raise HTTPException(409, '현재 상태에서는 업로드 작업을 재개할 수 없습니다.')
+    try:
+        path = (UPLOADS_DIR / Path(payload['staged_name']).name).resolve()
+        if path.parent != UPLOADS_DIR.resolve() or not path.is_file(): raise ValueError('staged file missing')
+        if path.stat().st_size != int(payload['size']) or sha256_file(path) != payload['checksum']: raise ValueError('checksum mismatch')
+    except (KeyError, OSError, ValueError):
+        jobs.update(job_id, phase='error', message='원본 검증 실패로 재업로드가 필요합니다.', progress=100, error='staged_upload_verification_failed')
+        raise HTTPException(409, '보관된 업로드 원본을 검증할 수 없습니다. 원본을 다시 업로드하세요.')
+    if not _upload_parse_slots.acquire(blocking=False): raise HTTPException(429, '업로드 분석 대기열이 가득 찼습니다.')
+    jobs.update(job_id, phase='queued', message='검증된 업로드 분석을 재개했습니다.', progress=56)
+    name, size, ext, mime = payload['filename'], int(payload['size']), payload['extension'], payload['mime']
+    checksum, idempotency_key = payload['checksum'], payload['idempotency_key']
+    def run() -> None:
+        try:
+            existing = _existing_upload(idempotency_key, checksum, size)
+            if existing is not None:
+                jobs.update(job_id, phase='complete', message='동일 파일 재시도를 기존 자료에 연결했습니다.', progress=100, result={'source_id': existing.get('id')})
+            else:
+                parse_staged_upload(name, path, size, ext, mime, job_id, lambda *args: _insert_uploaded(*args, checksum=checksum, size=size, idempotency_key=idempotency_key))
+        except Exception:
+            pass
+        finally:
+            _upload_parse_slots.release()
+    threading.Thread(target=run, name=f'source-upload-resume-{job_id[:12]}', daemon=True).start()
+    return {'job_id': job_id, 'accepted': True, 'resumed': True, 'phase': 'queued'}
 
 
 def add_web(url: str, title: str='') -> dict:

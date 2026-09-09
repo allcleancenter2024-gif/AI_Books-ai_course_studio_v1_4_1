@@ -49,7 +49,15 @@ def _backup_archive():
     count = 0
     with io.BytesIO() as buffer:
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-            for path in _iter_backup_paths(): archive.write(path, path.relative_to(BASE_DIR).as_posix()); count += 1
+            for path in _iter_backup_paths():
+                try:
+                    archive.write(path, path.relative_to(BASE_DIR).as_posix())
+                except OSError:
+                    # Windows can expose protected pseudo-files in a source
+                    # directory.  A best-effort source backup must not fail
+                    # because one unreadable, non-source entry is present.
+                    continue
+                count += 1
         result = buffer.getvalue()
     if len(result) > _MAX_BACKUP_BYTES: raise ValueError("백업 압축 파일이 GitHub 업로드 안전 한도(90MB)를 초과했습니다.")
     return result, count

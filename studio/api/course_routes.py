@@ -8,18 +8,17 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 
 from ..auth import require_authenticated
-from ..config import BOOK_EXPORTS_DIR
-from ..db import connect
-from ..multidb import service_record, service_records
 from ..schemas import BookAIRequest, CourseRequest, ExternalEditRequest, LessonApprovalRequest, LessonRequest, WeekAIRequest, WeekPartRequest
 from ..services.course_service import create_course
 from ..services.book_change_service import apply_change_to_book, repair_book_integrity
 from ..services.book_export_service import create_hwpx, create_pdf, create_pptx
-from ..services.education_quality import lesson_quality, set_approval
+from ..services.education_quality import lesson_quality, load_lesson_unit, set_approval
 from ..services.generation_service import build_book, generate_part, start_book_generation
 from ..services.job_status import jobs
 from ..services.lesson_service import student_lesson, teacher_lesson
 from ..services.external_edit import edit_book
+from ..services.book_service import book_source_path, export_course_markdown, get_book, list_books
+from ..services.source_service import resume_source_upload
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_authenticated)])
 
@@ -67,6 +66,8 @@ def resume_job(job_id: str):
     state = jobs.get(job_id)
     if not state: raise HTTPException(404, "작업 상태를 찾을 수 없습니다.")
     payload = state.get("payload") or {}
+    if payload.get("kind") == "source_upload":
+        return resume_source_upload(job_id)
     if payload.get("kind") != "book_generation": raise HTTPException(400, "재개할 수 있는 교재 생성 작업이 아닙니다.")
     if state.get("phase") not in {"cancelled", "error", "interrupted"}: raise HTTPException(409, "현재 상태에서는 작업을 재개할 수 없습니다.")
     return start_book_generation(payload["provider"], payload["weeks"], payload["audience"], payload["start"], payload.get("end"), payload.get("source_ids", []), job_id, payload.get("experience", "처음"), payload.get("device_paths", []), payload.get("edition", "combined"), payload.get("generation_mode", "local_only"), payload.get("web_scope", "disabled"))
@@ -84,15 +85,27 @@ def book_lesson_quality(book_id: int, week: int):
     record.pop("content_json", None)
     return record
 
+@router.get("/books/{book_id}/lessons/{week}")
+def book_lesson_unit(book_id: int, week: int, edition: str = "combined"):
+    """Return one independently stored lesson unit for Studio/Publisher handoff."""
+    if edition not in {"student", "teacher", "combined"}:
+        raise HTTPException(400, "edition은 student, teacher, combined 중 하나여야 합니다.")
+    record = load_lesson_unit(book_id, week)
+    if not record:
+        raise HTTPException(404, "해당 주차 교재를 찾을 수 없습니다.")
+    content = record["content"]
+    if edition == "student":
+        content = {"week": content.get("week"), "topic": content.get("topic"), "student": content.get("student", {}), "learning_design": content.get("learning_design", {})}
+    elif edition == "teacher":
+        content = {"week": content.get("week"), "topic": content.get("topic"), "teacher": content.get("teacher", {}), "learning_design": content.get("learning_design", {})}
+    source_ids = content.get("learning_design", {}).get("source_ids", [])
+    return {"book_id": book_id, "week": week, "edition": edition, "audience": record["audience"], "profile": record["profile"], "content": content, "quality": record["qa"], "approval_status": record["approval_status"], "publisher_handoff": {"source_ids": source_ids, "validation_status": record["qa"].get("validation_status", "validation_failed"), "requires_instructor_approval": record["approval_status"] != "approved"}}
+
 @router.post("/books/{book_id}/lessons/{week}/approval")
 def approve_lesson(book_id: int, week: int, req: LessonApprovalRequest): return set_approval(book_id, week, req.approved, req.reviewer, req.note)
 
 @router.get("/books")
-def books():
-    rows = service_records("books")
-    if rows is None:
-        with connect() as conn: return [dict(row) for row in conn.execute("SELECT id,weeks,audience,provider,model,created_at,md_path FROM books ORDER BY id DESC LIMIT 50")]
-    return [{key: row.get(key) for key in ("id", "weeks", "audience", "provider", "model", "created_at", "md_path")} for row in sorted(rows, key=lambda row: row.get("id", 0), reverse=True)[:50]]
+def books(): return list_books()
 
 @router.post("/books/{book_id}/changes/{product_name}")
 def add_change_to_book(book_id: int, product_name: str):
@@ -102,10 +115,7 @@ def add_change_to_book(book_id: int, product_name: str):
 def repair_book(book_id: int): return repair_book_integrity(book_id)
 
 def _export_path(book_id: int, suffix: str) -> tuple[dict, Path]:
-    row = _book_record(book_id)
-    if not row or not row.get("md_path"): raise HTTPException(404, "교재를 찾을 수 없습니다.")
-    source = Path(row["md_path"])
-    if not source.exists(): raise HTTPException(404, "교재 원본 파일을 찾을 수 없습니다.")
+    row, source = book_source_path(book_id)
     return row, source.with_suffix(suffix)
 
 @router.get("/export/book/{book_id}/pptx")
@@ -127,10 +137,7 @@ def export_book_hwpx(book_id: int):
     return FileResponse(path, filename=path.name, media_type="application/hwp+zip")
 
 def _book_record(book_id: int):
-    row = service_record("books", book_id)
-    if row is not None: return row
-    with connect() as conn: legacy = conn.execute("SELECT * FROM books WHERE id=?", (book_id,)).fetchone()
-    return dict(legacy) if legacy else None
+    return get_book(book_id)
 
 def _book_view_html(markdown: str, title: str) -> str:
     """Keep the original Markdown visible while marking appended update blocks."""
@@ -182,15 +189,5 @@ def view_book(book_id: int):
 
 @router.get("/export/course/{course_id}")
 def export_course(course_id: int):
-    data = service_record("courses", course_id)
-    if data is not None and data.get("data_json"): data = json.loads(data["data_json"])
-    if data is None:
-        with connect() as conn: row = conn.execute("SELECT * FROM courses WHERE id=?", (course_id,)).fetchone()
-        if not row: raise HTTPException(404, "과정을 찾을 수 없습니다.")
-        data = json.loads(row["data_json"])
-    if not data: raise HTTPException(404, "과정을 찾을 수 없습니다.")
-    lines = [f"# {data['weeks']}주 AI 강의계획서", "", f"대상: {data['audience']}", "", data["ratio"], ""]
-    for week in data["schedule"]: lines += [f"## {week['week']}주차 · {week['topic']}", f"- 대표 실습: {week['practice']}", "- 시간: 개념 18분 / 실기·실습 144분 / 정리·점검 18분", ""]
-    path = BOOK_EXPORTS_DIR.parent / f"course_{course_id}.md"
-    path.write_text("\n".join(lines), encoding="utf-8")
+    path = export_course_markdown(course_id)
     return FileResponse(path, filename=path.name, media_type="text/markdown")

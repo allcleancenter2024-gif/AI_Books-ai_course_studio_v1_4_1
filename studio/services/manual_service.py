@@ -17,7 +17,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from ..config import BASE_DIR, DB_PATH, LAST_UPDATED, MAX_UPLOAD_BYTES, PDF_OUTPUT_DIR, VERSION
+from ..config import APP_BASE_URL, BASE_DIR, DB_PATH, LAST_UPDATED, MAX_UPLOAD_BYTES, PDF_OUTPUT_DIR, VERSION
 from ..db import connect
 from ..schemas import ManualPDFRequest
 
@@ -73,7 +73,7 @@ def collect_operational_facts() -> dict[str, str]:
     return {
         "version": VERSION,
         "last_updated": LAST_UPDATED,
-        "studio_url": "http://127.0.0.1:8765",
+        "studio_url": APP_BASE_URL,
         "menu_count": f"{menu_count}개",
         "providers": "LM Studio, Ollama",
         "max_upload_mb": f"{MAX_UPLOAD_BYTES // (1024 * 1024)}MB",

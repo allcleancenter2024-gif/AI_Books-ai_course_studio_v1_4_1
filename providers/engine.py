@@ -12,6 +12,8 @@ from pathlib import Path
 from threading import RLock, Thread
 
 import httpx
+from studio.config import (LMSTUDIO_BASE_URL, LMSTUDIO_ENABLED, LMSTUDIO_TIMEOUT_SECONDS,
+                           OLLAMA_BASE_URL, OLLAMA_ENABLED, OLLAMA_TIMEOUT_SECONDS)
 
 
 @dataclass
@@ -32,15 +34,23 @@ class ProviderConfig:
 
 LOCAL_PROVIDERS = ("lmstudio", "ollama")
 
+# Conservative, implementation-backed capability declarations.  A capability
+# is advertised only when the gateway has a supported code path for it;
+# availability of a particular model is still checked during a request.
+PROVIDER_CAPABILITIES: dict[str, dict[str, bool]] = {
+    "lmstudio": {"chat": True, "stream": False, "vision": True, "structured_output": True, "embeddings": False},
+    "ollama": {"chat": True, "stream": False, "vision": True, "structured_output": True, "embeddings": False},
+}
+
 DEFAULTS: dict[str, ProviderConfig] = {
     "lmstudio": ProviderConfig(
         name="lmstudio",
         model="",
-        base_url="http://127.0.0.1:12345/v1",
+        base_url=LMSTUDIO_BASE_URL,
         api_key="lm-studio",
         # A local course stage should fail visibly rather than holding a job
         # at one percentage point for fifteen minutes.
-        timeout=180.0,
+        timeout=float(LMSTUDIO_TIMEOUT_SECONDS),
     ),
     "ollama": ProviderConfig(
         name="ollama",
@@ -48,9 +58,9 @@ DEFAULTS: dict[str, ProviderConfig] = {
         # auto-connect flow inspects the models that are actually installed
         # and chooses a resource-conscious general model.
         model="",
-        base_url="http://127.0.0.1:11434/v1",
+        base_url=OLLAMA_BASE_URL,
         api_key="ollama",
-        timeout=900.0,
+        timeout=float(OLLAMA_TIMEOUT_SECONDS),
     ),
 }
 
@@ -70,10 +80,38 @@ class ProviderManager:
     def get(self, name: str) -> ProviderConfig:
         if name not in self.configs:
             raise ProviderError(f"지원하지 않는 Provider입니다: {name}")
+        if not self.enabled(name):
+            raise ProviderError(f"{name} Provider는 환경 설정에서 비활성화되었습니다.")
         return self.configs[name]
 
+    @staticmethod
+    def enabled(name: str) -> bool:
+        return {"lmstudio": LMSTUDIO_ENABLED, "ollama": OLLAMA_ENABLED}.get(name, False)
+
     def list_public(self) -> list[dict[str, Any]]:
-        return [self.configs[k].public() for k in LOCAL_PROVIDERS]
+        return [{**self.configs[k].public(), **self.health_snapshot(k)} for k in LOCAL_PROVIDERS]
+
+    def capabilities(self, name: str) -> dict[str, bool]:
+        if name not in LOCAL_PROVIDERS:
+            raise ProviderError(f"지원하지 않는 Provider입니다: {name}")
+        return dict(PROVIDER_CAPABILITIES[name])
+
+    def health_snapshot(self, name: str) -> dict[str, Any]:
+        """Return safe status metadata without making a network request.
+
+        A live probe belongs to the explicit test/auto-connect operation.  The
+        normal status endpoint must remain fast and must not fail the Studio if
+        a local model server is stopped.
+        """
+        enabled = self.enabled(name)
+        cfg = self.configs.get(name)
+        if not cfg or not enabled:
+            status = "disabled"
+        elif cfg.model:
+            status = "configured"
+        else:
+            status = "degraded"
+        return {"enabled": enabled, "status": status, "capabilities": self.capabilities(name)}
 
     def configure(
         self,

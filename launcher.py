@@ -14,15 +14,15 @@ import traceback
 import urllib.request
 import webbrowser
 
-from studio.config import VERSION, APP_TITLE
+from studio.config import APP_HOST, APP_PORT, LOGS_DIR, VERSION, APP_TITLE
 
 BASE_DIR = Path(__file__).resolve().parent
-LOG_DIR = BASE_DIR / "logs"
+LOG_DIR = LOGS_DIR
 STARTUP_LOG = LOG_DIR / "startup_error.log"
 SERVER_OUT = LOG_DIR / "server_stdout.log"
 SERVER_ERR = LOG_DIR / "server_stderr.log"
-HOST = "127.0.0.1"
-PORT = 8765
+HOST = APP_HOST
+PORT = APP_PORT
 BASE_URL = f"http://{HOST}:{PORT}"
 REQUIRED = {
     "fastapi": "fastapi>=0.110",

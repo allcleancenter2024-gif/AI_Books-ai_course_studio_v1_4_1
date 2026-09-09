@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api", dependencies=[Depends(require_authenticated)])
 def sources_list(): return list_sources()
 
 @router.post("/sources/upload")
-def source_upload(file: UploadFile = File(...), job_id: str = Form(...), declared_size: int = Form(0)): return save_upload(file, job_id, declared_size)
+def source_upload(file: UploadFile = File(...), job_id: str = Form(...), declared_size: int = Form(0), idempotency_key: str = Form('')): return save_upload(file, job_id, declared_size, idempotency_key)
 
 @router.get("/jobs/{job_id}")
 def job_status(job_id: str):

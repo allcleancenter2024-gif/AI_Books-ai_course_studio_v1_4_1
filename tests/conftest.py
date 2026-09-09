@@ -7,6 +7,8 @@ from pathlib import Path
 
 TEST_RUNTIME = Path(tempfile.mkdtemp(prefix="ai-course-studio-tests-"))
 os.environ["AI_COURSE_STUDIO_RUNTIME_DIR"] = str(TEST_RUNTIME)
+os.environ["APP_ENV"] = "test"
+os.environ["PUBLIC_ACCESS"] = "false"
 
 def pytest_configure(config):
     # Keep pytest's fixtures away from shared Windows temp directories with stale ACLs.

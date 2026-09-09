@@ -130,9 +130,16 @@ def test_text_upload_and_job_status():
     body = ("대용량 안전 처리 확인\n" * 1000).encode("utf-8")
     response = client.post("/api/sources/upload", data={"job_id": job_id, "declared_size": len(body)}, files={"file": ("sample.txt", body, "text/plain")})
     assert response.status_code == 200
-    source_id = response.json()["id"]
-    status = client.get(f"/api/jobs/{job_id}").json()
+    assert response.json()["accepted"] is True
+    import time
+    deadline = time.monotonic() + 3
+    while time.monotonic() < deadline:
+        status = client.get(f"/api/jobs/{job_id}").json()
+        if status["phase"] in {"complete", "error", "cancelled"}:
+            break
+        time.sleep(.01)
     assert status["phase"] == "complete" and status["progress"] == 100
+    source_id = status["result"]["source_id"]
     listed = client.get("/api/sources").json()
     row = next(row for row in listed if row["id"] == source_id)
     assert row["has_text"] and row["original_retained"] is False and row["vector_status"].startswith("indexed:")

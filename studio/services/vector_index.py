@@ -34,6 +34,14 @@ def _chunks(text: str):
         start = end - CHUNK_OVERLAP
 
 
+def _lexical_score(query_tokens: set[str], text: str) -> float:
+    """Small local FTS-equivalent signal used beside the vector score."""
+    if not query_tokens:
+        return 0.0
+    tokens = set(_tokens(text))
+    return len(query_tokens & tokens) / len(query_tokens)
+
+
 def index_source(source_id: int, text: str) -> int:
     rows = [(source_id, no, start, end, _vector(text[start:end])) for no, (start, end) in enumerate(_chunks(text.strip()))]
     with connect() as conn:
@@ -49,17 +57,28 @@ def retrieve(ids: list[int], query: str, *, max_total: int = 24_000, per_source:
     placeholders = ",".join("?" for _ in ids)
     with connect() as conn:
         vectors = conn.execute(f"SELECT source_id,char_start,char_end,embedding FROM source_vectors WHERE source_id IN ({placeholders})", ids).fetchall()
-    q = struct.unpack(f"<{DIMENSIONS}f", _vector(query)); ranked = {source["id"]: [] for source in sources}
+    q = struct.unpack(f"<{DIMENSIONS}f", _vector(query)); query_tokens = set(_tokens(query))
+    ranked = {source["id"]: [] for source in sources}
+    source_text = {source["id"]: (source.get("extracted_text") or source.get("summary") or "").strip() for source in sources}
     for row in vectors:
         values = struct.unpack(f"<{DIMENSIONS}f", row["embedding"])
-        ranked[row["source_id"]].append((sum(a*b for a,b in zip(q, values)), row["char_start"], row["char_end"]))
+        start, end = row["char_start"], row["char_end"]
+        chunk = source_text.get(row["source_id"], "")[start:end]
+        vector_score = sum(a*b for a,b in zip(q, values))
+        lexical_score = _lexical_score(query_tokens, chunk)
+        # RRF-style fusion keeps either signal useful when the other is sparse.
+        fused_score = 0.7 * vector_score + 0.3 * lexical_score
+        ranked[row["source_id"]].append((fused_score, vector_score, lexical_score, start, end))
     blocks, used = [], 0
     for source in sources:
         text = (source.get("extracted_text") or source.get("summary") or "").strip()
         parts = sorted(ranked[source["id"]], reverse=True)[:3]
-        selected = "\n\n".join(text[start:end] for _, start, end in parts) if parts else text[:per_source]
+        selected = "\n\n".join(text[start:end] for _, _, _, start, end in parts) if parts else text[:per_source]
         if not selected: continue
+        best_score = round(float(parts[0][0]), 6) if parts else 0.0
         block = f"[참고자료 #{source['id']}: {source['title']} · 갱신: {source.get('updated_at') or '미확인'}]\n출처: {source.get('url') or '업로드 자료'}\n{selected[:per_source]}"[:max_total-used]
-        if block: blocks.append({"source_id": source["id"], "text": block}); used += len(block)
+        if block:
+            blocks.append({"source_id": source["id"], "source_name": source["title"], "score": best_score, "retrieval_type": "hybrid_rrf", "text": block})
+            used += len(block)
         if used >= max_total: break
     return blocks
