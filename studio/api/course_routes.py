@@ -4,11 +4,13 @@ import re
 from html import escape
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 
 from ..auth import require_authenticated
-from ..schemas import BookAIRequest, CourseRequest, ExternalEditRequest, LessonApprovalRequest, LessonRequest, WeekAIRequest, WeekPartRequest
+from ..schemas import (BookAIRequest, CourseRequest, ExternalEditRequest, ImagePromptApprovalRequest,
+                       ImagePromptDraftRequest, LessonApprovalRequest, LessonRequest,
+                       VisualAssetMetadataRequest, WeekAIRequest, WeekPartRequest)
 from ..services.course_service import create_course
 from ..services.book_change_service import apply_change_to_book, repair_book_integrity
 from ..services.book_export_service import create_hwpx, create_pdf, create_pptx
@@ -19,6 +21,9 @@ from ..services.lesson_service import student_lesson, teacher_lesson
 from ..services.external_edit import edit_book
 from ..services.book_service import book_source_path, export_course_markdown, get_book, list_books
 from ..services.source_service import resume_source_upload
+from ..services.asset_service import (add_uploaded_asset, asset_file, create_prompt_draft,
+                                      list_visuals, remove_asset, set_prompt_approval)
+from ..services.publication_snapshot import publication_snapshot
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_authenticated)])
 
@@ -103,6 +108,44 @@ def book_lesson_unit(book_id: int, week: int, edition: str = "combined"):
 
 @router.post("/books/{book_id}/lessons/{week}/approval")
 def approve_lesson(book_id: int, week: int, req: LessonApprovalRequest): return set_approval(book_id, week, req.approved, req.reviewer, req.note)
+
+@router.get("/books/{book_id}/lessons/{week}/visuals")
+def lesson_visuals(book_id: int, week: int):
+    """Preview-only visual metadata; no provider or storage credential is exposed."""
+    return list_visuals(book_id, week)
+
+@router.get("/books/{book_id}/lessons/{week}/publication-snapshot")
+def lesson_publication_snapshot(book_id: int, week: int):
+    return publication_snapshot(book_id, week)
+
+@router.post("/books/{book_id}/lessons/{week}/image-prompts/draft")
+def draft_lesson_image_prompt(book_id: int, week: int, req: ImagePromptDraftRequest):
+    return create_prompt_draft(book_id, week, purpose=req.purpose, style=req.style, aspect_ratio=req.aspect_ratio)
+
+@router.post("/image-prompts/{prompt_id}/approval")
+def approve_image_prompt(prompt_id: str, req: ImagePromptApprovalRequest):
+    return set_prompt_approval(prompt_id, req.approved)
+
+@router.post("/books/{book_id}/lessons/{week}/visual-assets", status_code=201)
+async def upload_lesson_visual_asset(
+    book_id: int, week: int, file: UploadFile = File(...), role: str = Form("hero"),
+    alt_text_ko: str = Form(...), alt_text_en: str = Form(""), caption_ko: str = Form(""),
+    caption_en: str = Form(""), source_type: str = Form("uploaded"), source_url: str = Form(""),
+    creator: str = Form(""), license: str = Form(""), copyright_status: str = Form("review_required"),
+):
+    metadata = VisualAssetMetadataRequest(role=role, alt_text_ko=alt_text_ko, alt_text_en=alt_text_en,
+        caption_ko=caption_ko, caption_en=caption_en, source_type=source_type, source_url=source_url,
+        creator=creator, license=license, copyright_status=copyright_status)
+    return await add_uploaded_asset(book_id, week, file, metadata.model_dump())
+
+@router.get("/visual-assets/{asset_id}/file")
+def visual_asset_file(asset_id: str):
+    asset, path = asset_file(asset_id)
+    return FileResponse(path, filename=asset["original_name"], media_type=asset["mime_type"])
+
+@router.delete("/visual-assets/{asset_id}", status_code=204)
+def delete_visual_asset(asset_id: str):
+    remove_asset(asset_id)
 
 @router.get("/books")
 def books(): return list_books()

@@ -97,6 +97,26 @@ class LessonApprovalRequest(BaseModel):
     reviewer: str = "강사"
     note: str = ""
 
+class ImagePromptDraftRequest(BaseModel):
+    purpose: str = Field(default="주차 대표 이미지", min_length=1, max_length=100)
+    style: str = Field(default="따뜻한 교육용 플랫 일러스트", min_length=1, max_length=160)
+    aspect_ratio: str = Field(default="16:9", pattern=r"^(16:9|4:3|1:1)$")
+
+class ImagePromptApprovalRequest(BaseModel):
+    approved: bool
+
+class VisualAssetMetadataRequest(BaseModel):
+    role: str = Field(default="hero", pattern=r"^(hero|concept|step|example|comparison|warning|summary|thumbnail)$")
+    alt_text_ko: str = Field(min_length=1, max_length=500)
+    alt_text_en: str = Field(default="", max_length=500)
+    caption_ko: str = Field(default="", max_length=500)
+    caption_en: str = Field(default="", max_length=500)
+    source_type: str = Field(default="uploaded", pattern=r"^(uploaded|ai_generated|licensed|public_domain)$")
+    source_url: str = Field(default="", max_length=1000)
+    creator: str = Field(default="", max_length=200)
+    license: str = Field(default="", max_length=200)
+    copyright_status: str = Field(default="review_required", pattern=r"^(review_required|cleared|restricted)$")
+
 class ManualPDFChapter(BaseModel):
     index: int = Field(ge=1, le=100)
     category: str = Field(min_length=1, max_length=80)

@@ -54,10 +54,12 @@ BOOK_EXPORTS_DIR = EXPORTS_DIR / "books"
 LOGS_DIR = RUNTIME_DIR / "logs"
 STATIC_DIR = BASE_DIR / "static"
 UPLOADS_DIR = RUNTIME_DIR / "uploads"
+ASSETS_DIR = RUNTIME_DIR / "assets"
 SOURCE_PACKS_DIR = EXPORTS_DIR / "source_packs"
 SUMMARY_EXPORTS_DIR = EXPORTS_DIR / "summaries"
 PDF_OUTPUT_DIR = RUNTIME_DIR / "output" / "pdf"
 MAX_UPLOAD_BYTES = _bounded_int("MAX_UPLOAD_SIZE_MB", 500, 1, 500) * 1024 * 1024
+MAX_IMAGE_ASSET_BYTES = _bounded_int("MAX_IMAGE_ASSET_SIZE_MB", 12, 1, 20) * 1024 * 1024
 UPLOAD_CHUNK_BYTES = _bounded_int("UPLOAD_CHUNK_SIZE_MB", 1, 1, 16) * 1024 * 1024
 EXTRACTED_TEXT_LIMIT = 120_000
 # Summary calls are deliberately bounded: a single worker protects local
@@ -107,6 +109,7 @@ def configuration_summary() -> dict[str, object]:
         "runtime_dir": str(RUNTIME_DIR),
         "data_store_role": DATA_STORE_ROLE,
         "max_upload_bytes": MAX_UPLOAD_BYTES,
+        "max_image_asset_bytes": MAX_IMAGE_ASSET_BYTES,
         "upload_parse_max_concurrent": UPLOAD_PARSE_MAX_CONCURRENT,
         "upload_parse_queue_limit": UPLOAD_PARSE_QUEUE_LIMIT,
         "upload_staging_retention_seconds": UPLOAD_STAGING_RETENTION_SECONDS,
@@ -156,5 +159,5 @@ def web_search_configuration() -> dict[str, object]:
         "extractor_timeout_seconds": _bounded_int("LOCAL_WEB_EXTRACTOR_TIMEOUT_SECONDS", timeout, 1, 60),
     }
 
-for path in (DB_PATH.parent, EXPORTS_DIR, BOOK_EXPORTS_DIR, LOGS_DIR, UPLOADS_DIR, SOURCE_PACKS_DIR, SUMMARY_EXPORTS_DIR, PDF_OUTPUT_DIR):
+for path in (DB_PATH.parent, EXPORTS_DIR, BOOK_EXPORTS_DIR, LOGS_DIR, UPLOADS_DIR, ASSETS_DIR, SOURCE_PACKS_DIR, SUMMARY_EXPORTS_DIR, PDF_OUTPUT_DIR):
     path.mkdir(parents=True, exist_ok=True)

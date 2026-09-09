@@ -48,6 +48,28 @@ def init_db():
     if "payload_json" not in {row[1] for row in cur.execute("PRAGMA table_info(job_states)")}: 
         cur.execute("ALTER TABLE job_states ADD COLUMN payload_json TEXT")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_job_states_updated_at ON job_states(updated_at)")
+    cur.execute("""CREATE TABLE IF NOT EXISTS visual_assets(
+        id TEXT PRIMARY KEY, book_id INTEGER NOT NULL, week INTEGER NOT NULL,
+        role TEXT NOT NULL, storage_key TEXT NOT NULL UNIQUE, original_name TEXT NOT NULL,
+        mime_type TEXT NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL,
+        aspect_ratio TEXT NOT NULL, alt_text_ko TEXT NOT NULL, alt_text_en TEXT NOT NULL DEFAULT '',
+        caption_ko TEXT NOT NULL DEFAULT '', caption_en TEXT NOT NULL DEFAULT '',
+        source_type TEXT NOT NULL, source_url TEXT NOT NULL DEFAULT '', creator TEXT NOT NULL DEFAULT '',
+        license TEXT NOT NULL DEFAULT '', copyright_status TEXT NOT NULL DEFAULT 'review_required',
+        checksum TEXT NOT NULL, approved INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL,
+        approved_at TEXT, FOREIGN KEY(book_id) REFERENCES books(id) ON DELETE CASCADE)""")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_visual_assets_book_week ON visual_assets(book_id, week)")
+    cur.execute("""CREATE TABLE IF NOT EXISTS image_prompts(
+        id TEXT PRIMARY KEY, book_id INTEGER NOT NULL, week INTEGER NOT NULL, asset_id TEXT,
+        purpose TEXT NOT NULL, prompt_ko TEXT NOT NULL, prompt_en TEXT NOT NULL,
+        negative_prompt_ko TEXT NOT NULL DEFAULT '', negative_prompt_en TEXT NOT NULL DEFAULT '',
+        style TEXT NOT NULL, aspect_ratio TEXT NOT NULL, audience TEXT NOT NULL,
+        generation_status TEXT NOT NULL DEFAULT 'prompt_only', review_status TEXT NOT NULL DEFAULT 'needs_review',
+        prompt_source_language TEXT NOT NULL DEFAULT 'ko_en', translation_status TEXT NOT NULL DEFAULT 'draft',
+        created_by TEXT NOT NULL DEFAULT 'studio', created_at TEXT NOT NULL, approved_at TEXT,
+        FOREIGN KEY(book_id) REFERENCES books(id) ON DELETE CASCADE,
+        FOREIGN KEY(asset_id) REFERENCES visual_assets(id) ON DELETE SET NULL)""")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_image_prompts_book_week ON image_prompts(book_id, week)")
     cur.execute("""CREATE TABLE IF NOT EXISTS manual_update_state(
         id INTEGER PRIMARY KEY CHECK(id=1), snapshot_json TEXT NOT NULL,
         fingerprint TEXT NOT NULL, applied_at TEXT NOT NULL)""")
@@ -89,5 +111,6 @@ def init_db():
     cur.execute("INSERT OR IGNORE INTO app_schema_migrations(version,applied_at) VALUES('003_hybrid_evidence',datetime('now'))")
     cur.execute("INSERT OR IGNORE INTO app_schema_migrations(version,applied_at) VALUES('004_web_api_usage',datetime('now'))")
     cur.execute("INSERT OR IGNORE INTO app_schema_migrations(version,applied_at) VALUES('005_persistent_job_states',datetime('now'))")
+    cur.execute("INSERT OR IGNORE INTO app_schema_migrations(version,applied_at) VALUES('006_visual_assets_and_image_prompts',datetime('now'))")
     conn.commit()
     conn.close()
