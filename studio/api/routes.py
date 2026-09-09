@@ -15,7 +15,7 @@ def system_info():
     """Runtime facts shown in the UI; never expose credentials."""
     return {
         'version': VERSION, 'last_updated': LAST_UPDATED,
-        'changes': '검토형 이미지 자산·한글/영문 Prompt·반응형 미리보기·출판 스냅샷 게이트 추가',
+        'changes': 'Publisher 교재 자동 선택·최근 상태 복원·단계별 미리보기 로딩 보강',
         'rdbms': RDBMS_NAME, 'role': RDBMS_ROLE,
         'location': str(DB_PATH.parent), 'database_file': DB_PATH.name,
     }
