@@ -1,27 +1,27 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
-title AI Course Studio v1.26.3 - Secure Launcher
+title AI Course Studio v1.27.2 - Secure Launcher
 cd /d "%~dp0"
+echo AI Course Studio v1.27.2
+echo Starting Studio. Keep this window open while using the program.
 echo.
-echo AI Course Studio v1.26.3 - secure local launcher
-echo HWPX, PPTX, PDF export support enabled.
-echo The browser will open after the server is ready.
-echo Sign in on the Studio opening screen.
+where py.exe >nul 2>&1
+if not errorlevel 1 (
+  py -3 "%~dp0launcher.py"
+  goto :finished
+)
+where python.exe >nul 2>&1
+if not errorlevel 1 (
+  python "%~dp0launcher.py"
+  goto :finished
+)
+echo ERROR: Python 3 was not found.
+set "STUDIO_EXIT=10"
+goto :pause_and_exit
+:finished
+set "STUDIO_EXIT=%errorlevel%"
+:pause_and_exit
 echo.
-where py.exe >nul 2>nul
-if not errorlevel 1 goto use_py
-where python.exe >nul 2>nul
-if not errorlevel 1 goto use_python
-echo Python 3 was not found.
-echo Install Python 3.10 or newer, then run this file again.
-pause
-exit /b 10
-:use_py
-py -3 launcher.py
-goto done
-:use_python
-python launcher.py
-:done
-set code=%errorlevel%
-if not %code%==0 pause
-exit /b %code%
+echo Studio launcher stopped. Press any key to close this window.
+pause >nul
+exit /b %STUDIO_EXIT%

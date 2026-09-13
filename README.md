@@ -1,6 +1,6 @@
 # AI 강의 활용 Studio v1.27.2 [2026-09-13]
 
-이번 릴리스의 변경 내역은 [v1.27.2 변경 기록](CHANGELOG_v1.27.2.md)을 확인하세요. 기존 EXE는 재패키징하지 않았으므로 새 소스 실행에는 `run_windows.bat`를 사용합니다.
+이번 릴리스의 변경 내역은 [v1.27.2 변경 기록](CHANGELOG_v1.27.2.md)을 확인하세요. Windows에서는 `AI_Course_Studio_v1_27_2.exe` 또는 `run_windows.bat`를 사용합니다. 실행 창은 Studio 종료 후 수동으로 닫을 수 있습니다.
 
 ## 실행
 1. ZIP을 새 폴더에 압축 해제합니다.

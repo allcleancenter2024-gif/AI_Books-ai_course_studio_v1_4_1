@@ -1,4 +1,5 @@
 import json
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from ..config import VERSION, LAST_UPDATED, DB_PATH, RDBMS_NAME, RDBMS_ROLE
 from ..data.catalog import TOPICS
@@ -36,3 +37,12 @@ def products(): return _product_rows()
 
 @router.get('/products/changes')
 def product_changes(): return [row for row in _product_rows() if row['has_changes']]
+
+@router.get('/publisher/status')
+def publisher_status():
+    """Probe the optional local Publisher without making it a Studio dependency."""
+    try:
+        response = httpx.get('http://127.0.0.1:3010/', timeout=httpx.Timeout(1.5))
+        return {'available': response.is_success, 'status_code': response.status_code, 'url': 'http://127.0.0.1:3010/'}
+    except (httpx.HTTPError, ValueError):
+        return {'available': False, 'status_code': None, 'url': 'http://127.0.0.1:3010/'}

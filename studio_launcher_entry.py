@@ -26,4 +26,15 @@ if __name__ == "__main__":
     if not command:
         print("[ERROR] Python 3 was not found. Install Python 3.10 or newer, then try again.")
         raise SystemExit(10)
-    raise SystemExit(subprocess.call([*command, str(launcher), *sys.argv[1:]], cwd=root))
+    try:
+        result = subprocess.call([*command, str(launcher), *sys.argv[1:]], cwd=root)
+    except KeyboardInterrupt:
+        result = 130
+    if getattr(sys, "frozen", False):
+        print("\nStudio 실행기가 종료되었습니다.")
+        print("이 창을 닫아 실행 파일을 종료하거나 Enter 키를 눌러 닫으세요.")
+        try:
+            input()
+        except (EOFError, KeyboardInterrupt):
+            pass
+    raise SystemExit(result)

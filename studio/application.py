@@ -7,7 +7,7 @@ from .config import APP_TITLE, VERSION, LAST_UPDATED, STATIC_DIR
 from .api.auth_routes import router as public_router
 from .api.provider_routes import router as provider_router
 from .api.source_routes import router as source_router
-from .api.course_routes import router as course_router
+from .api.course_routes import router as course_router, public_view_router
 from .api.manual_routes import router as manual_router
 from .api.hybrid_routes import router as hybrid_router
 from .api.github_routes import router as github_router
@@ -28,6 +28,7 @@ def create_app():
     app.include_router(public_router)
     app.include_router(provider_router)
     app.include_router(source_router)
+    app.include_router(public_view_router)
     app.include_router(course_router)
     app.include_router(manual_router)
     app.include_router(hybrid_router)

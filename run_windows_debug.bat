@@ -1,21 +1,26 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
-title AI Course Studio - Startup Diagnostics
+title AI Course Studio v1.27.2 - Startup Diagnostics
 cd /d "%~dp0"
-echo Running diagnostics for the secured Studio launcher...
-where py.exe >nul 2>nul
-if not errorlevel 1 goto use_py
-where python.exe >nul 2>nul
-if not errorlevel 1 goto use_python
-echo Python 3 was not found.
-pause
-exit /b 10
-:use_py
-py -3 launcher.py --diagnose
-goto done
-:use_python
-python launcher.py --diagnose
-:done
+echo AI Course Studio v1.27.2 diagnostics
 echo.
-echo Diagnostics finished.
-pause
+where py.exe >nul 2>&1
+if not errorlevel 1 (
+  py -3 "%~dp0launcher.py" --diagnose
+  goto :finished
+)
+where python.exe >nul 2>&1
+if not errorlevel 1 (
+  python "%~dp0launcher.py" --diagnose
+  goto :finished
+)
+echo ERROR: Python 3 was not found.
+set "STUDIO_EXIT=10"
+goto :pause_and_exit
+:finished
+set "STUDIO_EXIT=%errorlevel%"
+:pause_and_exit
+echo.
+echo Diagnostics finished. Press any key to close this window.
+pause >nul
+exit /b %STUDIO_EXIT%

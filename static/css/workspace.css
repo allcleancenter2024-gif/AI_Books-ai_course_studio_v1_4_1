@@ -4,6 +4,8 @@
 .side { max-height:calc(100vh - 32px); overflow-y:auto; }
 .publisher-actions { display:flex; flex-wrap:wrap; gap:12px; margin-top:16px; }
 .publisher-actions a { padding:12px 18px; border:1px solid #acc8d4; border-radius:12px; background:#e3f0fb; color:#19324a; font-weight:700; }
+.publisher-status-message { margin-top:12px; padding:11px 13px; border:1px solid #f0c3b9; border-left:4px solid #c64a3b; border-radius:10px; background:#fff7f5; color:#7e3027; font-size:13px; line-height:1.5; }.publisher-status-message span { display:block; margin-top:3px; color:#765b57; }.publisher-actions a[aria-disabled="true"] { opacity:.7; }
+.publisher-dashboard-link { background:#3156d3!important; border-color:#3156d3!important; color:#fff!important; }.publisher-dashboard-link.is-disabled { background:#eef2f7!important; border-color:#cbd6e4!important; color:#708197!important; cursor:not-allowed; }
 :focus-visible { outline:3px solid #005fcc; outline-offset:3px; }
 @media(max-width:900px) { .side { position:static; max-height:none; } }
 @media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto!important; } *,*::before,*::after { animation:none!important; transition:none!important; } .login-video { display:none; } }
