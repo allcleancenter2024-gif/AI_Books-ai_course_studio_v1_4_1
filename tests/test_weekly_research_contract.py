@@ -38,3 +38,13 @@ def test_optional_fallback_preserves_evidence_without_publisher_changes():
     }
     assert failed["hermes_status"] == "failed" and failed["optional_fallback"] is True
     assert completed["hermes_status"] == "completed" and completed["optional_fallback"] is False
+
+
+def test_weekly_run_lock_blocks_overlap_and_releases():
+    first = "test-owner-1"
+    second = "test-owner-2"
+    assert weekly_research._acquire_run_lock(first)
+    assert not weekly_research._acquire_run_lock(second)
+    weekly_research._release_run_lock(first)
+    assert weekly_research._acquire_run_lock(second)
+    weekly_research._release_run_lock(second)

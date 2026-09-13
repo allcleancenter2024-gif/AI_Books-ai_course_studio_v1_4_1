@@ -63,6 +63,17 @@ MIGRATIONS: tuple[Migration, ...] = (
             )""",
         ),
     ),
+    Migration(
+        "010_weekly_research_lock",
+        (
+            """CREATE TABLE weekly_research_lock(
+                lock_name TEXT PRIMARY KEY,
+                owner_id TEXT NOT NULL,
+                acquired_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL
+            )""",
+        ),
+    ),
 )
 
 

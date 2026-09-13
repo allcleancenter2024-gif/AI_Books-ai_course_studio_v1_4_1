@@ -5,6 +5,7 @@ import hashlib
 import time
 import json
 import os
+import uuid
 from pathlib import Path
 from .. import config
 import httpx
@@ -37,6 +38,30 @@ def collect():
             evidence.append({'source':name,'url':url,'digest':hashlib.sha256(text.encode()).hexdigest(),'text':text})
         except Exception as exc: evidence.append({'source':name,'url':url,'error':type(exc).__name__})
     return evidence
+
+
+def _acquire_run_lock(owner_id: str, lease_seconds: int = 3600) -> bool:
+    """Serialize Studio catch-up and OS-triggered runners across processes."""
+    now = datetime.now(timezone.utc)
+    expires = now + timedelta(seconds=lease_seconds)
+    with connect() as conn:
+        conn.execute("DELETE FROM weekly_research_lock WHERE lock_name=? AND expires_at<=?", ("weekly", now.isoformat()))
+        try:
+            conn.execute(
+                "INSERT INTO weekly_research_lock(lock_name,owner_id,acquired_at,expires_at) VALUES(?,?,?,?)",
+                ("weekly", owner_id, now.isoformat(), expires.isoformat()),
+            )
+            conn.commit()
+            return True
+        except Exception:
+            conn.rollback()
+            return False
+
+
+def _release_run_lock(owner_id: str) -> None:
+    with connect() as conn:
+        conn.execute("DELETE FROM weekly_research_lock WHERE lock_name=? AND owner_id=?", ("weekly", owner_id))
+        conn.commit()
 
 
 def _summary_prompt(changed: list[dict]) -> str:
@@ -94,7 +119,7 @@ def _optional_fallback(phase: str, evidence_packet_id: int, draft_created: bool)
         "publisher_changed": False,
     }
 
-def run():
+def _run_locked():
     started_monotonic = time.monotonic()
     telemetry = _telemetry(started_monotonic)
 
@@ -165,3 +190,23 @@ def run():
             'status': 'error', 'evidence_packet_id': packet, 'error': type(exc).__name__,
             'changed_sources': [r['source'] for r in changed], **_optional_fallback('error', packet, False),
         })
+
+
+def run():
+    """Run at most one weekly job across Studio and an OS trigger."""
+    _init()
+    owner_id = f"{os.getpid()}-{uuid.uuid4().hex}"
+    if not _acquire_run_lock(owner_id):
+        payload = {'status': 'already_running', 'skipped': True}
+        target = os.getenv('WEEKLY_RESEARCH_RESULT_PATH', '')
+        if target:
+            path = Path(target)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix('.tmp')
+            tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
+            tmp.replace(path)
+        return payload
+    try:
+        return _run_locked()
+    finally:
+        _release_run_lock(owner_id)
