@@ -1,4 +1,5 @@
 import logging
+from threading import Thread
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,6 +11,7 @@ from .api.course_routes import router as course_router
 from .api.manual_routes import router as manual_router
 from .api.hybrid_routes import router as hybrid_router
 from .api.github_routes import router as github_router
+from .api.agent_routes import router as agent_router
 from .api.routes import router
 from .db import init_db
 
@@ -18,6 +20,10 @@ def create_app():
     # Run migrations before the first request so a clean installation works too.
     init_db()
     app = FastAPI(title=APP_TITLE, version=VERSION)
+    @app.on_event("startup")
+    def catch_up_weekly_research():
+        from .services.weekly_research import due, run
+        if due(): Thread(target=run, daemon=True, name="weekly-research-catchup").start()
     app.mount('/static', StaticFiles(directory=STATIC_DIR), name='static')
     app.include_router(public_router)
     app.include_router(provider_router)
@@ -26,6 +32,7 @@ def create_app():
     app.include_router(manual_router)
     app.include_router(hybrid_router)
     app.include_router(github_router)
+    app.include_router(agent_router)
     app.include_router(router)
 
     @app.middleware("http")

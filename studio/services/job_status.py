@@ -54,8 +54,10 @@ class JobStore:
         if not row:
             return None
         data = dict(row)
-        data["result"] = json.loads(data.pop("result_json")) if data.get("result_json") else None
-        data["payload"] = json.loads(data.pop("payload_json")) if data.get("payload_json") else None
+        result_json = data.pop("result_json", None)
+        payload_json = data.pop("payload_json", None)
+        data["result"] = json.loads(result_json) if result_json else None
+        data["payload"] = json.loads(payload_json) if payload_json else None
         return Job(**data)
 
     def update(self, job_id: str, **values) -> dict:

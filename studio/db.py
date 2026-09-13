@@ -1,6 +1,103 @@
+import re
 import sqlite3
+from dataclasses import dataclass
 from .config import DB_PATH
 from .data.catalog import PRODUCTS
+
+
+@dataclass(frozen=True)
+class Migration:
+    """One ordered, transactional schema migration."""
+
+    version: str
+    statements: tuple[str, ...]
+
+
+# Existing releases 001-006 are still bootstrapped by the legacy-compatible
+# init block below. New schema work must be added here starting at 007.
+MIGRATIONS: tuple[Migration, ...] = (
+    Migration(
+        "007_agent_drafts",
+        (
+            """CREATE TABLE agent_drafts(
+                id TEXT PRIMARY KEY,
+                agent_task_id TEXT NOT NULL UNIQUE,
+                agent_source TEXT NOT NULL,
+                agent_version TEXT NOT NULL,
+                content TEXT NOT NULL,
+                review_required INTEGER NOT NULL DEFAULT 1 CHECK(review_required=1),
+                quality_gate_status TEXT NOT NULL DEFAULT 'not_checked',
+                human_approval_status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )""",
+            "CREATE INDEX idx_agent_drafts_created_at ON agent_drafts(created_at DESC)",
+        ),
+    ),
+    Migration(
+        "008_agent_task_audit",
+        (
+            """CREATE TABLE agent_task_audit(
+                correlation_id TEXT PRIMARY KEY,
+                idempotency_key TEXT NOT NULL UNIQUE,
+                hermes_task_id TEXT UNIQUE,
+                status TEXT NOT NULL,
+                prompt_sha256 TEXT NOT NULL,
+                deadline_at TEXT NOT NULL,
+                retry_count INTEGER NOT NULL DEFAULT 0 CHECK(retry_count >= 0 AND retry_count <= 2),
+                error_code TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )""",
+            "CREATE INDEX idx_agent_task_audit_hermes_task_id ON agent_task_audit(hermes_task_id)",
+            "CREATE INDEX idx_agent_task_audit_updated_at ON agent_task_audit(updated_at DESC)",
+        ),
+    ),
+    Migration(
+        "009_weekly_research_state",
+        (
+            """CREATE TABLE weekly_research_state(
+                source TEXT PRIMARY KEY,
+                digest TEXT NOT NULL,
+                last_success_at TEXT NOT NULL
+            )""",
+        ),
+    ),
+)
+
+
+def apply_migrations(conn: sqlite3.Connection, migrations: tuple[Migration, ...] = MIGRATIONS) -> list[str]:
+    """Apply each pending migration once, rolling back a failed version fully."""
+    versions = [migration.version for migration in migrations]
+    if versions != sorted(versions) or len(versions) != len(set(versions)):
+        raise ValueError("Migration versions must be unique and sorted")
+    if any(not re.fullmatch(r"\d{3}_[a-z0-9_]+", version) for version in versions):
+        raise ValueError("Migration versions must use NNN_lowercase_name")
+
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS app_schema_migrations("
+        "version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
+    )
+    conn.commit()
+    applied = {row[0] for row in conn.execute("SELECT version FROM app_schema_migrations")}
+    completed: list[str] = []
+    for migration in migrations:
+        if migration.version in applied:
+            continue
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            for statement in migration.statements:
+                conn.execute(statement)
+            conn.execute(
+                "INSERT INTO app_schema_migrations(version,applied_at) VALUES(?,datetime('now'))",
+                (migration.version,),
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        completed.append(migration.version)
+    return completed
 
 
 def connect():
@@ -113,4 +210,5 @@ def init_db():
     cur.execute("INSERT OR IGNORE INTO app_schema_migrations(version,applied_at) VALUES('005_persistent_job_states',datetime('now'))")
     cur.execute("INSERT OR IGNORE INTO app_schema_migrations(version,applied_at) VALUES('006_visual_assets_and_image_prompts',datetime('now'))")
     conn.commit()
+    apply_migrations(conn)
     conn.close()

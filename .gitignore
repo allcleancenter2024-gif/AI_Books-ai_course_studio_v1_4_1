@@ -27,3 +27,6 @@ providers/*
 !providers/__init__.py
 !providers/engine.py
 !providers/errors.py
+!providers/local_model_policy.py
+!providers/agents/
+!providers/agents/*.py

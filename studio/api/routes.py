@@ -15,7 +15,7 @@ def system_info():
     """Runtime facts shown in the UI; never expose credentials."""
     return {
         'version': VERSION, 'last_updated': LAST_UPDATED,
-        'changes': '미리보기·출판 오류 안내·12초 응답 제한·다시 시도 처리 보강',
+        'changes': '최신 AI 정보 제품별 변경 전·후 대시보드와 Markdown 파일 제공',
         'rdbms': RDBMS_NAME, 'role': RDBMS_ROLE,
         'location': str(DB_PATH.parent), 'database_file': DB_PATH.name,
     }

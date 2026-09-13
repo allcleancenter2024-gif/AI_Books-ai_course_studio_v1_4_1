@@ -8,8 +8,8 @@ load_dotenv(PROJECT_DIR / ".env", override=False)
 
 # Versioning policy: patch for small fixes (v1.4.1 -> v1.4.2), minor for
 # substantial user-facing changes (v1.4.1 -> v1.5.0).
-VERSION = "1.26.3"
-LAST_UPDATED = "2026-09-10"
+VERSION = "1.27.0"
+LAST_UPDATED = "2026-09-13"
 APP_TITLE = f"AI 강의 활용 Studio v{VERSION} [{LAST_UPDATED}]"
 BASE_DIR = PROJECT_DIR
 
@@ -71,6 +71,8 @@ def _safe_limit(name: str, default: int, minimum: int, maximum: int) -> int:
 
 SUMMARY_MAX_CONCURRENT = _safe_limit("AI_COURSE_STUDIO_SUMMARY_MAX_CONCURRENT", 1, 1, 2)
 SUMMARY_QUEUE_LIMIT = _safe_limit("AI_COURSE_STUDIO_SUMMARY_QUEUE_LIMIT", 2, 0, 4)
+BOOK_GENERATION_MAX_CONCURRENT = 1
+BOOK_GENERATION_QUEUE_LIMIT = _safe_limit("AI_COURSE_STUDIO_BOOK_GENERATION_QUEUE_LIMIT", 2, 0, 4)
 UPLOAD_PARSE_MAX_CONCURRENT = _safe_limit("AI_COURSE_STUDIO_UPLOAD_PARSE_MAX_CONCURRENT", 1, 1, 2)
 UPLOAD_PARSE_QUEUE_LIMIT = _safe_limit("AI_COURSE_STUDIO_UPLOAD_PARSE_QUEUE_LIMIT", 2, 0, 4)
 UPLOAD_STAGING_RETENTION_SECONDS = _bounded_int("AI_COURSE_STUDIO_UPLOAD_STAGING_RETENTION_SECONDS", 24 * 60 * 60, 300, 7 * 24 * 60 * 60)
@@ -96,6 +98,30 @@ LOCAL_WEB_EXTRACTOR_MAX_BYTES = _bounded_int("LOCAL_WEB_EXTRACTOR_MAX_BYTES", 8 
 LOCAL_WEB_EXTRACTOR_MAX_TEXT_CHARS = _bounded_int("LOCAL_WEB_EXTRACTOR_MAX_TEXT_CHARS", 120_000, 1_000, 500_000)
 LOCAL_WEB_EXTRACTOR_TIMEOUT_SECONDS = _bounded_int("LOCAL_WEB_EXTRACTOR_TIMEOUT_SECONDS", WEB_SEARCH_TIMEOUT_SECONDS, 1, 60)
 
+# Optional agent orchestration. Hermes is deliberately separate from the LLM
+# provider gateway and disabled unless an operator explicitly enables it.
+SCHEDULER_OWNER = os.getenv("SCHEDULER_OWNER", "STUDIO").strip().upper() or "STUDIO"
+HERMES_CRON_ENABLED = _env_flag("HERMES_CRON_ENABLED", False)
+HERMES_ENABLED = _env_flag("HERMES_ENABLED", False)
+HERMES_BASE_URL = os.getenv("HERMES_BASE_URL", "").strip().rstrip("/")
+HERMES_API_KEY = os.getenv("HERMES_API_KEY", "").strip()
+HERMES_HEALTH_TIMEOUT_SECONDS = _bounded_int("HERMES_HEALTH_TIMEOUT_SECONDS", 3, 1, 15)
+HERMES_TASK_TIMEOUT_SECONDS = _bounded_int("HERMES_TASK_TIMEOUT_SECONDS", 300, 30, 3600)
+HERMES_WEEKLY_SUMMARY_TIMEOUT_SECONDS = _bounded_int("HERMES_WEEKLY_SUMMARY_TIMEOUT_SECONDS", 180, 120, 300)
+# These limits are used only by the Studio-owned weekly summary contract.  They
+# do not alter generic Hermes tasks or the selected Hermes model/profile.
+HERMES_WEEKLY_SOURCE_CHAR_LIMIT = _bounded_int("HERMES_WEEKLY_SOURCE_CHAR_LIMIT", 900, 400, 3000)
+HERMES_WEEKLY_OUTPUT_CHAR_LIMIT = _bounded_int("HERMES_WEEKLY_OUTPUT_CHAR_LIMIT", 600, 200, 1200)
+HERMES_ALLOW_WRITE = _env_flag("HERMES_ALLOW_WRITE", False)
+HERMES_ALLOW_BROWSER = _env_flag("HERMES_ALLOW_BROWSER", False)
+HERMES_ALLOW_TERMINAL = _env_flag("HERMES_ALLOW_TERMINAL", False)
+HERMES_ALLOW_CRON = _env_flag("HERMES_ALLOW_CRON", False)
+HERMES_ALLOW_MCP = _env_flag("HERMES_ALLOW_MCP", False)
+HERMES_ALLOW_BOT_MODE = _env_flag("HERMES_ALLOW_BOT_MODE", False)
+HERMES_ALLOW_WEBHOOK = _env_flag("HERMES_ALLOW_WEBHOOK", False)
+HERMES_PROFILE = os.getenv("HERMES_PROFILE", "studio").strip() or "studio"
+HERMES_VERSION = os.getenv("HERMES_VERSION", "0.17.0").strip() or "0.17.0"
+
 
 def configuration_summary() -> dict[str, object]:
     """Safe, secret-free configuration facts for diagnostics and tests."""
@@ -118,8 +144,19 @@ def configuration_summary() -> dict[str, object]:
         "ollama_timeout_seconds": OLLAMA_TIMEOUT_SECONDS,
         "lmstudio_timeout_seconds": LMSTUDIO_TIMEOUT_SECONDS,
         "lmstudio_max_parallel_calls": LMSTUDIO_MAX_PARALLEL_CALLS,
+        "book_generation_max_concurrent": BOOK_GENERATION_MAX_CONCURRENT,
+        "book_generation_queue_limit": BOOK_GENERATION_QUEUE_LIMIT,
         "web_search_enabled": WEB_SEARCH_ENABLED,
         "web_search_timeout_seconds": WEB_SEARCH_TIMEOUT_SECONDS,
+        "scheduler_owner": SCHEDULER_OWNER,
+        "hermes_cron_enabled": HERMES_CRON_ENABLED,
+        "hermes_enabled": HERMES_ENABLED,
+        "hermes_health_timeout_seconds": HERMES_HEALTH_TIMEOUT_SECONDS,
+        "hermes_task_timeout_seconds": HERMES_TASK_TIMEOUT_SECONDS,
+        "hermes_weekly_summary_timeout_seconds": HERMES_WEEKLY_SUMMARY_TIMEOUT_SECONDS,
+        "hermes_weekly_source_char_limit": HERMES_WEEKLY_SOURCE_CHAR_LIMIT,
+        "hermes_weekly_output_char_limit": HERMES_WEEKLY_OUTPUT_CHAR_LIMIT,
+        "hermes_allow_write": HERMES_ALLOW_WRITE,
     }
 
 
@@ -132,6 +169,14 @@ def configuration_issues() -> list[str]:
         issues.append("production requires AI_COURSE_STUDIO_COOKIE_SECURE=1")
     if APP_ENV == "test" and RUNTIME_DIR == BASE_DIR:
         issues.append("test runtime must not use the project runtime directory")
+    if SCHEDULER_OWNER != "STUDIO":
+        issues.append("SCHEDULER_OWNER must be STUDIO")
+    if HERMES_CRON_ENABLED or HERMES_ALLOW_CRON:
+        issues.append("Hermes Cron must remain disabled; Studio owns scheduling")
+    if HERMES_ENABLED and not HERMES_BASE_URL.startswith(("http://", "https://")):
+        issues.append("HERMES_ENABLED requires an HTTP(S) HERMES_BASE_URL")
+    if HERMES_ENABLED and not HERMES_API_KEY:
+        issues.append("HERMES_ENABLED requires HERMES_API_KEY")
     return issues
 
 
