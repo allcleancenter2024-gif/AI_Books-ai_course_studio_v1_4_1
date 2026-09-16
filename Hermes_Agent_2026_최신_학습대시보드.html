@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hermes Agent 2026 최신 학습 대시보드</title>
+<style>
+:root{
+  --bg:#f4f7fb;--panel:#ffffff;--ink:#182230;--muted:#667085;--line:#e4e7ec;
+  --mint:#dff7ef;--blue:#dfeeff;--lav:#eee7ff;--coral:#ffe8df;--yellow:#fff4cc;
+  --accent:#3659c9;--nav:#172033;--good:#0f7b61;--warn:#a15c00;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:Inter,Pretendard,"Noto Sans KR",Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.65}
+a{color:var(--accent)}
+.layout{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:100vh}
+aside{background:var(--nav);color:#fff;padding:26px 18px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{font-size:24px;font-weight:800;margin-bottom:4px}
+.sub{font-size:12px;color:#b8c2d9;margin-bottom:18px}
+.search{width:100%;padding:11px 12px;border:1px solid #34415e;border-radius:12px;background:#202b43;color:#fff;margin:8px 0 18px}
+.nav a{display:block;color:#dbe3f3;text-decoration:none;padding:8px 10px;border-radius:9px;font-size:14px}
+.nav a:hover{background:#25314c;color:#fff}
+main{padding:30px 34px 70px;max-width:1500px}
+.hero{background:linear-gradient(135deg,#e7f1ff,#efe8ff 54%,#e3f8f0);border:1px solid #d8e3f5;border-radius:26px;padding:30px;box-shadow:0 12px 35px rgba(38,55,91,.08)}
+.kicker{font-weight:700;color:#3659c9;font-size:13px}
+h1{font-size:38px;line-height:1.2;margin:8px 0 12px}
+h2{font-size:26px;margin:42px 0 16px}
+h3{font-size:19px;margin:22px 0 8px}
+.lead{font-size:18px;max-width:1000px}
+.badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.badge{background:#fff8;border:1px solid #ffffffaa;padding:6px 10px;border-radius:999px;font-size:13px;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:20px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:0 4px 14px rgba(25,39,68,.04)}
+.card h3{margin-top:0}
+.big{font-size:28px;font-weight:800}
+.muted{color:var(--muted)}
+.mint{background:var(--mint)}.blue{background:var(--blue)}.lav{background:var(--lav)}.coral{background:var(--coral)}.yellow{background:var(--yellow)}
+.flow{display:grid;grid-template-columns:repeat(7,1fr);gap:9px;align-items:stretch}
+.step{padding:14px 10px;border-radius:14px;text-align:center;font-weight:700;background:white;border:1px solid var(--line)}
+.arrow{color:#98a2b3;text-align:center}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:16px;background:white}
+table{border-collapse:collapse;width:100%;min-width:700px}
+th,td{padding:12px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:#f8fafc}
+.timeline{border-left:3px solid #b7c8ff;margin-left:8px;padding-left:20px}
+.release{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;margin:14px 0}
+.release .date{font-size:12px;color:var(--muted);font-weight:700}
+.release .ver{font-size:18px;font-weight:800}
+.callout{border-left:5px solid #5977dd;background:#eef3ff;padding:16px 18px;border-radius:12px;margin:16px 0}
+.warn{border-left-color:#d18400;background:#fff7e4}
+.good{border-left-color:#17866a;background:#e9f8f3}
+.code{background:#121827;color:#e8edf7;padding:18px;border-radius:14px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre}
+.check{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.check div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.tabbtn{border:1px solid var(--line);background:white;border-radius:999px;padding:8px 12px;cursor:pointer}
+.tabbtn.active{background:#263b75;color:white}
+.tabpane{display:none}.tabpane.active{display:block}
+footer{margin-top:60px;padding-top:25px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+@media(max-width:1050px){.layout{grid-template-columns:1fr} aside{position:relative;height:auto}.nav{display:none}.grid{grid-template-columns:repeat(2,1fr)}.flow{grid-template-columns:repeat(2,1fr)}main{padding:20px}}
+@media(max-width:640px){h1{font-size:29px}.grid,.check{grid-template-columns:1fr}.flow{grid-template-columns:1fr}.hero{padding:20px}}
+.highlight{outline:3px solid #ffd66b}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside>
+  <div class="brand">Hermes Agent</div>
+  <div class="sub">2026 최신 학습 대시보드 · 기준일 2026-09-13</div>
+  <input id="search" class="search" placeholder="키워드 검색: MCP, Bot Mode, Memory...">
+  <div class="nav">
+    <a href="#summary">30초 요약</a>
+    <a href="#concept">정의와 구조</a>
+    <a href="#components">핵심 구성요소</a>
+    <a href="#timeline">7월 이후 업데이트</a>
+    <a href="#security">보안</a>
+    <a href="#proscons">장단점</a>
+    <a href="#learning">학습 순서</a>
+    <a href="#usecases">활용 사례</a>
+    <a href="#compare">비교</a>
+    <a href="#glossary">용어 사전</a>
+    <a href="#sources">출처</a>
+  </div>
+</aside>
+
+<main>
+<section class="hero searchable" id="summary">
+  <div class="kicker">NOUS RESEARCH · OPEN-SOURCE AI AGENT</div>
+  <h1>Hermes Agent 2026<br>쉽게 배우는 구조형 대시보드</h1>
+  <p class="lead"><b>Hermes Agent</b>는 단순한 챗봇이 아니라, 기억하고 도구를 사용하며 작업을 위임하고 반복 업무를 자동화하는 <b>오픈소스 개인 AI 에이전트</b>입니다.</p>
+  <div class="badges">
+    <span class="badge">MIT License</span><span class="badge">Persistent Memory</span><span class="badge">Skills</span>
+    <span class="badge">Subagents</span><span class="badge">Bot Mode</span><span class="badge">MCP</span><span class="badge">Cron</span><span class="badge">A2A</span>
+  </div>
+</section>
+
+<div class="grid searchable">
+  <div class="card mint"><div class="muted">현재 조사 기준 최신</div><div class="big">v0.21.2</div><div>2026-09-11 · state.db 신뢰성 보강</div></div>
+  <div class="card blue"><div class="muted">전환점</div><div class="big">v0.20</div><div>Voice · A2A · Webhook · Grounded Research</div></div>
+  <div class="card lav"><div class="muted">다중 Agent</div><div class="big">v0.21</div><div>Bot Mode · Cron Memory · Live Steering</div></div>
+  <div class="card coral"><div class="muted">핵심 정체성</div><div class="big">Agent</div><div>LLM + Tool + Memory + Skill + Automation</div></div>
+</div>
+
+<section id="concept" class="searchable">
+<h2>1. Hermes를 한 번에 이해하기</h2>
+<div class="callout good"><b>한 문장:</b> “대화만 하는 AI”를 넘어, <b>기억하고 → 도구를 쓰고 → 업무를 나누고 → 반복해서 실행하고 → 다른 Agent와 협업</b>하는 AI 작업 플랫폼입니다.</div>
+<div class="flow">
+ <div class="step mint">① 입력</div><div class="step blue">② 판단</div><div class="step lav">③ Tool 실행</div><div class="step yellow">④ Memory</div><div class="step coral">⑤ Skill 재사용</div><div class="step mint">⑥ Cron 자동화</div><div class="step blue">⑦ Agent 협업</div>
+</div>
+
+<h3>일반 챗봇과 비교</h3>
+<div class="table-wrap"><table>
+<tr><th>일반 Chat AI</th><th>Hermes Agent</th></tr>
+<tr><td>질문에 답하는 상담원</td><td>실제 작업까지 연결하는 디지털 작업자</td></tr>
+<tr><td>대화 중심</td><td>대화 + 파일 + 터미널 + 브라우저 + MCP + 메시징</td></tr>
+<tr><td>세션 중심</td><td>지속 메모리 사용 가능</td></tr>
+<tr><td>주로 하나의 AI</td><td>Subagent + Bot Mode + A2A</td></tr>
+<tr><td>사용자가 계속 지시</td><td>Cron으로 반복·예약 작업 가능</td></tr>
+</table></div>
+
+<h3>전체 구조</h3>
+<div class="code">사용자
+ ├─ Desktop
+ ├─ CLI / TUI
+ └─ Messaging Gateway
+       │
+       ▼
+ ┌──────────────────────┐
+ │   Hermes Agent Core  │
+ │  계획 · 추론 · Tool  │
+ └──────────────────────┘
+   │     │      │
+   │     │      ├─ Memory / Skills / Sessions
+   │     ├─ Subagents / Bot Mode
+   │     └─ Cron / Automation
+   │
+   ├─ Browser / Web
+   ├─ Terminal / Files
+   ├─ MCP
+   ├─ Messaging
+   ├─ Vision / Image / TTS
+   └─ Webhooks / External APIs</div>
+</section>
+
+<section id="components">
+<h2>2. 핵심 구성요소 8개</h2>
+<div class="grid">
+ <div class="card searchable"><h3>🧠 Memory</h3><p>세션을 넘어 사용자 선호, 프로젝트 정보, 경험을 유지합니다.</p></div>
+ <div class="card searchable"><h3>🧩 Skills</h3><p>반복 업무를 재사용 가능한 “작업 설명서”로 축적합니다.</p></div>
+ <div class="card searchable"><h3>🛠 Tools</h3><p>브라우저, 파일, 터미널, 검색 등 실제 기능을 실행합니다.</p></div>
+ <div class="card searchable"><h3>👥 Subagents</h3><p>복잡한 업무를 여러 하위 AI에 분담·병렬 처리합니다.</p></div>
+ <div class="card searchable"><h3>🤖 Bot Mode</h3><p>각기 다른 역할·기억·도구를 가진 전문 Bot을 팀처럼 운영합니다.</p></div>
+ <div class="card searchable"><h3>⏰ Cron</h3><p>반복 업무를 예약하고, 최신 버전에서는 작업 연속성과 메모리도 강화했습니다.</p></div>
+ <div class="card searchable"><h3>🔌 MCP</h3><p>AI와 외부 도구·서비스를 표준 방식으로 연결합니다.</p></div>
+ <div class="card searchable"><h3>🔄 A2A</h3><p>Agent와 Agent가 서로 업무를 주고받는 상호운용 구조입니다.</p></div>
+</div>
+
+<div class="tabs">
+<button class="tabbtn active" onclick="tab('memory',this)">Memory</button>
+<button class="tabbtn" onclick="tab('skill',this)">Skill vs Tool</button>
+<button class="tabbtn" onclick="tab('bot',this)">Bot Mode</button>
+<button class="tabbtn" onclick="tab('auto',this)">Automation</button>
+</div>
+<div id="memory" class="tabpane active card searchable">
+<h3>Memory를 쉽게 이해하기</h3>
+<p>Memory는 “지난 대화를 통째로 외우는 것”만을 뜻하지 않습니다. 사용자 선호, 환경 정보, 프로젝트 맥락, 반복해서 쓰는 사실을 다음 세션에서 활용할 수 있게 유지하는 구조입니다.</p>
+<p><b>주의:</b> API Key, 비밀번호, 개인정보 같은 민감정보는 일반 Memory보다 별도의 Secret 관리 정책이 필요합니다.</p>
+</div>
+<div id="skill" class="tabpane card searchable">
+<h3>Skill과 Tool의 차이</h3>
+<p><b>Skill = 일을 하는 방법</b>, <b>Tool = 실제로 실행하는 기능</b>입니다. “공식자료 우선으로 AI 최신 뉴스 조사하기”는 Skill이고, 웹 검색 기능은 Tool입니다.</p>
+</div>
+<div id="bot" class="tabpane card searchable">
+<h3>Subagent와 Bot Mode</h3>
+<p>Subagent는 특정 업무를 잠시 나눠 맡는 작업자에 가깝습니다. Bot Mode의 Bot은 역할·모델·지침·기억·Skill·Tool·대화 기록을 독립적으로 갖는 장기 전문 구성원에 가깝습니다.</p>
+</div>
+<div id="auto" class="tabpane card searchable">
+<h3>Cron + Memory</h3>
+<p>“매주 금요일 조사”처럼 예약 실행할 수 있고, 2026년 8월 이후에는 작업별 메모리·연속성이 강화되어 지난 실행 결과를 다음 실행과 연결하는 구조가 중요해졌습니다.</p>
+</div>
+</section>
+
+<section id="timeline">
+<h2>3. 2026년 7월 이후 최신 업데이트</h2>
+<div class="timeline">
+ <div class="release searchable"><div class="date">2026-07-20</div><div class="ver">v0.19.0 · Quicksilver</div><p>응답·Streaming 성능, Smart command approval, 비밀정보 소스, Subagent 및 메시지 지속성 강화.</p><b>학습 포인트:</b> “기능 많은 Agent”에서 “오래 운영 가능한 Agent”로 발전.</div>
+ <div class="release searchable"><div class="date">2026-08-03</div><div class="ver">v0.20.0 · Herald</div><p>실시간 Voice, Wake word, A2A v1.0, 서명 Webhook, 인용 기반 Grounded Research, Desktop Artifact, Plugin SDK.</p><b>학습 포인트:</b> 외부 시스템·다른 Agent와 연결되는 허브로 확장.</div>
+ <div class="release searchable"><div class="date">2026-08-31</div><div class="ver">v0.21.0 · Pantheon</div><p>Bot Mode, Bot 그룹채팅, Peer messaging, Cron Memory/Continuity, Subagent live steering, MCP 관리, Desktop Browser 제어.</p><b>학습 포인트:</b> 개인 Agent에서 “Agent 팀 운영 플랫폼”으로 전환.</div>
+ <div class="release searchable"><div class="date">2026-09-07</div><div class="ver">v0.21.1</div><p>모듈화, 파일·Startup 성능, Provider/Model, Desktop 세션, Browser annotation, MCP authorization, Cron/Delegation 안정화.</p></div>
+ <div class="release searchable"><div class="date">2026-09-11</div><div class="ver">v0.21.2 · 최신</div><p><code>state.db</code>의 다중 writer·lock·잘못된 손상 판정·세션 목록 실패 문제 등을 집중 보완.</p><b>학습 포인트:</b> 큰 기능 확장 후 운영 안정성을 보강하는 패치.</div>
+</div>
+</section>
+
+<section id="security">
+<h2>4. 보안 — 가장 중요한 부분</h2>
+<div class="callout warn searchable"><b>Hermes는 실제 파일·터미널·브라우저를 다룰 수 있습니다.</b> 따라서 일반 챗봇보다 권한이 강하고, 승인·Secret 관리·Skill/MCP 검증이 중요합니다.</div>
+<div class="check searchable">
+<div>☑ 위험 명령 승인 유지</div><div>☑ API Key를 일반 대화에 노출하지 않기</div>
+<div>☑ 외부 Skill 설치 전 검사</div><div>☑ MCP 서버 권한 확인</div>
+<div>☑ 삭제·게시·결제는 사람 최종 승인</div><div>☑ 업데이트 전 세션/DB 백업</div>
+<div>☑ Agent 지침 파일 쓰기 승인</div><div>☑ 승인 우회 모드는 테스트 환경 중심</div>
+</div>
+</section>
+
+<section id="proscons">
+<h2>5. 장점과 단점</h2>
+<div class="grid">
+<div class="card mint searchable"><h3>장점 ① 오픈소스</h3><p>MIT License. 코드 감사·수정·확장 가능.</p></div>
+<div class="card blue searchable"><h3>장점 ② Provider 독립성</h3><p>여러 LLM Provider와 사용자 지정 Endpoint를 선택 가능.</p></div>
+<div class="card lav searchable"><h3>장점 ③ 기억과 학습</h3><p>Memory + Skill로 개인화된 장기 작업 환경 구성.</p></div>
+<div class="card coral searchable"><h3>장점 ④ 자동화와 협업</h3><p>Cron + MCP + Browser + Subagent + Bot Mode.</p></div>
+<div class="card yellow searchable"><h3>주의 ① 복잡도</h3><p>초보자에게 Provider, 권한, Tool, MCP 설정이 복잡할 수 있음.</p></div>
+<div class="card yellow searchable"><h3>주의 ② 강한 권한</h3><p>컴퓨터를 직접 다룰 수 있어 잘못된 실행의 영향이 큼.</p></div>
+<div class="card yellow searchable"><h3>주의 ③ 빠른 업데이트</h3><p>짧은 기간에 대규모 변경이 들어가므로 버전별 차이 큼.</p></div>
+<div class="card yellow searchable"><h3>주의 ④ 운영 안정성</h3><p>v0.21.2의 DB 패치처럼 큰 업데이트 후 충분한 검증 필요.</p></div>
+</div>
+</section>
+
+<section id="learning">
+<h2>6. 초보자 권장 학습 순서</h2>
+<div class="table-wrap"><table class="searchable">
+<tr><th>단계</th><th>학습 내용</th><th>목표</th></tr>
+<tr><td>1</td><td>Desktop / 기본 Chat</td><td>UI와 기본 흐름 이해</td></tr>
+<tr><td>2</td><td>Model / Provider</td><td>Hermes와 LLM의 차이 이해</td></tr>
+<tr><td>3</td><td>File / Browser Tool</td><td>Agent가 도구를 쓰는 방식 이해</td></tr>
+<tr><td>4</td><td>Memory</td><td>세션을 넘어 맥락 유지</td></tr>
+<tr><td>5</td><td>Skills</td><td>반복 절차 재사용</td></tr>
+<tr><td>6</td><td>Subagents</td><td>업무 분할·병렬 처리</td></tr>
+<tr><td>7</td><td>Cron</td><td>반복 업무 자동화</td></tr>
+<tr><td>8</td><td>MCP</td><td>외부 도구 연결</td></tr>
+<tr><td>9</td><td>Bot Mode</td><td>전문 AI 팀 구성</td></tr>
+<tr><td>10</td><td>A2A / Webhook</td><td>Agent 및 외부 시스템 연동</td></tr>
+</table></div>
+</section>
+
+<section id="usecases">
+<h2>7. 활용 사례</h2>
+<div class="grid">
+<div class="card searchable"><h3>📚 AI 강의자료 제작</h3><p>Research Bot → Curriculum Bot → Fact Check Bot → Visual Bot → Publisher Bot.</p></div>
+<div class="card searchable"><h3>💻 웹 개발</h3><p>코드 분석 → 병렬 검토 → 수정 → 브라우저 테스트 → 문서화.</p></div>
+<div class="card searchable"><h3>🔎 주간 리서치</h3><p>Cron → 공식자료 검색 → 이전 Memory와 비교 → 새로운 변화만 요약.</p></div>
+<div class="card searchable"><h3>🖥 시스템 운영</h3><p>상태 점검 → 로그 확인 → 이상 감지 → 사람에게 보고. 중요한 변경은 승인.</p></div>
+</div>
+</section>
+
+<section id="compare">
+<h2>8. 일반 AI 도구와 비교</h2>
+<div class="table-wrap"><table class="searchable">
+<tr><th>항목</th><th>일반 Chat AI</th><th>코딩 Agent</th><th>Hermes Agent</th></tr>
+<tr><td>대화</td><td>강함</td><td>강함</td><td>강함</td></tr>
+<tr><td>파일·터미널</td><td>제품별 차이</td><td>강함</td><td>강함</td></tr>
+<tr><td>지속 Memory</td><td>제품별 차이</td><td>제품별 차이</td><td>핵심 기능</td></tr>
+<tr><td>Skill 학습</td><td>제한적</td><td>일부</td><td>핵심 구조</td></tr>
+<tr><td>Cron</td><td>제한적</td><td>일부</td><td>내장</td></tr>
+<tr><td>Multi-agent</td><td>일부</td><td>일부</td><td>Subagent + Bot Mode</td></tr>
+<tr><td>MCP</td><td>확대 중</td><td>확대 중</td><td>적극 지원</td></tr>
+<tr><td>A2A</td><td>제한적</td><td>제한적</td><td>v1.0 지원</td></tr>
+<tr><td>오픈소스</td><td>제품별 차이</td><td>제품별 차이</td><td>MIT</td></tr>
+</table></div>
+</section>
+
+<section id="glossary">
+<h2>9. 핵심 용어 사전</h2>
+<div class="grid">
+<div class="card searchable"><b>Agent</b><br><span class="muted">여러 단계를 스스로 수행하는 AI 작업자</span></div>
+<div class="card searchable"><b>LLM</b><br><span class="muted">Agent의 언어·추론을 담당하는 모델</span></div>
+<div class="card searchable"><b>Tool</b><br><span class="muted">실제 기능을 실행하는 도구</span></div>
+<div class="card searchable"><b>Skill</b><br><span class="muted">반복 작업을 수행하는 절차 설명서</span></div>
+<div class="card searchable"><b>Memory</b><br><span class="muted">이전 정보를 유지하는 기억 구조</span></div>
+<div class="card searchable"><b>Subagent</b><br><span class="muted">일부 업무를 맡는 하위 AI</span></div>
+<div class="card searchable"><b>Bot Mode</b><br><span class="muted">전문 AI 여러 개를 팀처럼 운영</span></div>
+<div class="card searchable"><b>Cron</b><br><span class="muted">예약·반복 실행</span></div>
+<div class="card searchable"><b>MCP</b><br><span class="muted">AI와 외부 도구를 연결하는 표준</span></div>
+<div class="card searchable"><b>A2A</b><br><span class="muted">Agent 사이 통신 규격</span></div>
+<div class="card searchable"><b>Webhook</b><br><span class="muted">이벤트를 외부 시스템으로 전달</span></div>
+<div class="card searchable"><b>Provider</b><br><span class="muted">실제 LLM을 제공하는 서비스</span></div>
+</div>
+</section>
+
+<section>
+<h2>10. 최종 학습 공식</h2>
+<div class="callout good searchable" style="font-size:20px">
+<b>LLM이 생각하고 → Agent가 계획하고 → Tool이 실행하고 → Memory가 기억하고 → Skill이 재사용하고 → Cron이 반복하고 → 다른 Agent와 협업한다.</b>
+</div>
+</section>
+
+<section id="sources">
+<h2>11. 공식 출처</h2>
+<div class="card searchable">
+<p><b>공식 문서</b><br><a href="https://hermes-agent.nousresearch.com/docs/" target="_blank">hermes-agent.nousresearch.com/docs</a></p>
+<p><b>GitHub</b><br><a href="https://github.com/NousResearch/hermes-agent" target="_blank">github.com/NousResearch/hermes-agent</a></p>
+<p><b>Releases</b><br><a href="https://github.com/NousResearch/hermes-agent/releases" target="_blank">github.com/NousResearch/hermes-agent/releases</a></p>
+<p><b>개발 가이드</b><br><a href="https://github.com/NousResearch/hermes-agent/blob/main/AGENTS.md" target="_blank">AGENTS.md</a></p>
+<p><b>기여·확장 가이드</b><br><a href="https://github.com/NousResearch/hermes-agent/blob/main/CONTRIBUTING.md" target="_blank">CONTRIBUTING.md</a></p>
+</div>
+<div class="callout searchable"><b>본 문서에서 중점 확인한 릴리스:</b> v2026.7.20 · v2026.8.3 · v2026.8.31 · v2026.9.7 · v2026.9.11</div>
+</section>
+
+<footer>
+작성 기준일 2026-09-13 · 실제 설치/운영 전에는 공식 GitHub Releases에서 최신 태그를 다시 확인하세요.
+</footer>
+</main>
+</div>
+
+<script>
+function tab(id,btn){
+ document.querySelectorAll('.tabpane').forEach(x=>x.classList.remove('active'));
+ document.querySelectorAll('.tabbtn').forEach(x=>x.classList.remove('active'));
+ document.getElementById(id).classList.add('active'); btn.classList.add('active');
+}
+const q=document.getElementById('search');
+q.addEventListener('input',()=>{
+ const v=q.value.trim().toLowerCase();
+ document.querySelectorAll('.searchable').forEach(el=>{
+   el.classList.remove('highlight');
+   if(!v){el.classList.remove('hidden');return;}
+   const hit=el.innerText.toLowerCase().includes(v);
+   el.classList.toggle('hidden',!hit);
+   if(hit) el.classList.add('highlight');
+ });
+});
+</script>
+</body>
+</html>

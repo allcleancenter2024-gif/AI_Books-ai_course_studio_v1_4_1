@@ -1,8 +1,8 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
-title AI Course Studio v1.27.2 - Secure Launcher
+title AI Course Studio v1.28.0 - Secure Launcher
 cd /d "%~dp0"
-echo AI Course Studio v1.27.2
+echo AI Course Studio v1.28.0
 echo Starting Studio. Keep this window open while using the program.
 echo.
 where py.exe >nul 2>&1

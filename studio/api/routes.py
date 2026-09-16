@@ -1,7 +1,7 @@
 import json
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from ..config import VERSION, LAST_UPDATED, DB_PATH, RDBMS_NAME, RDBMS_ROLE
+from ..config import VERSION, LAST_UPDATED, DB_PATH, RDBMS_NAME, RDBMS_ROLE, FEATURE_AI_TOOL_LEARNING_CENTER
 from ..data.catalog import TOPICS
 from ..auth import require_authenticated
 from ..services.generation_service import providers
@@ -19,6 +19,7 @@ def system_info():
         'changes': '최신 AI 정보 제품별 변경 전·후 대시보드와 Markdown 파일 제공',
         'rdbms': RDBMS_NAME, 'role': RDBMS_ROLE,
         'location': str(DB_PATH.parent), 'database_file': DB_PATH.name,
+        'feature_ai_tool_learning_center': FEATURE_AI_TOOL_LEARNING_CENTER,
     }
 
 @router.get('/status')

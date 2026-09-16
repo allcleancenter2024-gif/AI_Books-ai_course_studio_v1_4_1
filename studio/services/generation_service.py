@@ -2,14 +2,16 @@ from datetime import datetime
 from typing import Any
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from threading import RLock, Thread
+from threading import BoundedSemaphore, RLock, Thread
 import json
 import re
 from fastapi import HTTPException
 from providers.engine import ProviderManager, ProviderError, extract_json
 from generators.course_content import SYSTEM_PROMPT, book_to_markdown
 from generators.staged_content import lesson_part_prompt,prompts_part_prompt,exercises_part_prompt,prompt_item_prompt,exercise_item_prompt
-from ..config import LOGS_DIR, BOOK_EXPORTS_DIR, LMSTUDIO_MAX_PARALLEL_CALLS
+from ..config import (BOOK_EXPORTS_DIR, BOOK_GENERATION_MAX_CONCURRENT,
+                      BOOK_GENERATION_QUEUE_LIMIT, LMSTUDIO_MAX_PARALLEL_CALLS,
+                      LOGS_DIR)
 from ..multidb import upsert_service, next_service_id
 from .course_service import course_source
 from .lesson_service import student_lesson, teacher_lesson
@@ -24,6 +26,8 @@ from .evidence_pack import build_evidence_pack
 providers=ProviderManager()
 _book_job_lock = RLock()
 _active_book_jobs: dict[str, str] = {}
+_book_capacity_slots = BoundedSemaphore(BOOK_GENERATION_MAX_CONCURRENT + BOOK_GENERATION_QUEUE_LIMIT)
+_book_worker_slots = BoundedSemaphore(BOOK_GENERATION_MAX_CONCURRENT)
 
 # Small local reasoning models need enough room for complete JSON objects.
 # LM Studio/Ollama adapters disable hidden thinking, so these are visible-output
@@ -336,14 +340,22 @@ def start_book_generation(provider,weeks,audience,start,end=None,source_ids=None
             existing=jobs.get(current)
             if existing and existing.get('phase') not in {'complete','error'}:
                 return {'job_id':current,'accepted':True,'already_running':True}
+        if not _book_capacity_slots.acquire(blocking=False):
+            raise HTTPException(429, '교재 생성 대기열이 가득 찼습니다. 현재 작업이 끝난 뒤 다시 시도하세요.')
         _active_book_jobs[requested_id]=requested_id
-        jobs.update(requested_id,phase='queued',message='교재 생성 작업을 대기열에 추가했습니다.',progress=1,error='',result=None,
-                    payload={'kind':'book_generation','provider':provider,'weeks':weeks,'audience':audience,'start':start,'end':end,
-                             'source_ids':source_ids or [],'experience':experience,'device_paths':device_paths or [],'edition':edition,
-                             'generation_mode':generation_mode,'web_scope':web_scope})
+        try:
+            jobs.update(requested_id,phase='queued',message='교재 생성 작업을 대기열에 추가했습니다.',progress=1,error='',result=None,
+                        payload={'kind':'book_generation','provider':provider,'weeks':weeks,'audience':audience,'start':start,'end':end,
+                                 'source_ids':source_ids or [],'experience':experience,'device_paths':device_paths or [],'edition':edition,
+                                 'generation_mode':generation_mode,'web_scope':web_scope})
+        except Exception:
+            _active_book_jobs.pop(requested_id, None)
+            _book_capacity_slots.release()
+            raise
     def run():
         try:
-            result=build_book(provider,weeks,audience,start,end,source_ids,requested_id,experience,device_paths,edition,generation_mode,web_scope)
+            with _book_worker_slots:
+                result=build_book(provider,weeks,audience,start,end,source_ids,requested_id,experience,device_paths,edition,generation_mode,web_scope)
             if result.get("cancelled"):
                 return
             jobs.update(requested_id,phase='complete',message='교재 파일 저장 완료',progress=100,result=result)
@@ -351,7 +363,14 @@ def start_book_generation(provider,weeks,audience,start,end=None,source_ids=None
             detail=str(getattr(exc,'detail',exc))
             jobs.update(requested_id,phase='error',message='교재 생성 실패',progress=100,error=detail[:1000])
         finally:
+            _book_capacity_slots.release()
             with _book_job_lock:
                 if _active_book_jobs.get(requested_id)==requested_id:_active_book_jobs.pop(requested_id,None)
-    Thread(target=run,name=f'book-generation-{requested_id[:16]}',daemon=True).start()
+    try:
+        Thread(target=run,name=f'book-generation-{requested_id[:16]}',daemon=True).start()
+    except Exception:
+        _book_capacity_slots.release()
+        with _book_job_lock:
+            _active_book_jobs.pop(requested_id, None)
+        raise
     return {'job_id':requested_id,'accepted':True,'already_running':False}

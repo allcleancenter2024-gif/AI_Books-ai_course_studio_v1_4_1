@@ -377,13 +377,16 @@ def summarize_source(source_id:int, provider_manager, provider:str, job_id: str=
         else: summary='텍스트를 추출할 수 없어 자동 요약을 생략했습니다.'
     else:
         summary=summarize_text(provider_manager,provider,text,update)
+        if getattr(summary, 'used_fallback', False) and job_id:
+            jobs.update(job_id, phase='summarizing', message='AI 응답 지연: 원문 추출 방식으로 요약을 안전하게 완료하는 중', progress=96)
     filename=f"source_{source_id}_summary.md"; destination=SUMMARY_EXPORTS_DIR/filename
     markdown=f"# 참고자료 요약 · {d['title']}\n\n- 생성일: {_now()}\n- AI Provider: {provider}\n- 원본: {d.get('url') or d.get('original_name') or '업로드 자료'}\n\n## 요약\n\n{summary}\n"
     destination.write_text(markdown,encoding='utf-8')
     update_source_record(source_id,summary=summary,summary_path=str(destination),status='summarized')
     mirror_source(get_source(source_id))
-    if job_id: jobs.update(job_id, phase='complete', message='요약 파일 생성 완료', progress=100)
-    return {'id':source_id,'title':d['title'],'summary':summary,'download_url':f'/api/sources/{source_id}/summary-file'}
+    fallback = bool(getattr(summary, 'used_fallback', False))
+    if job_id: jobs.update(job_id, phase='complete', message='AI 응답 지연으로 추출 요약 완료' if fallback else '요약 파일 생성 완료', progress=100)
+    return {'id':source_id,'title':d['title'],'summary':summary,'download_url':f'/api/sources/{source_id}/summary-file', 'summary_mode':'extractive_fallback' if fallback else 'ai'}
 
 
 def start_source_summary(source_id: int, provider_manager, provider: str, job_id: str = '') -> dict:

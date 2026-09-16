@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Course Studio v1.28.0 릴리스 대시보드</title>
+<style>
+:root{font-family:Segoe UI,Malgun Gothic,sans-serif;color:#17233d;background:#f5f7fb}body{margin:0}.wrap{max-width:1100px;margin:auto;padding:28px}.hero{padding:28px;border-radius:22px;background:linear-gradient(135deg,#172b59,#6949b7);color:white;box-shadow:0 12px 30px #182b5926}.hero h1{margin:0 0 8px}.hero p{margin:0;color:#e7eaff}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0}.card,section{background:white;border:1px solid #e1e7f0;border-radius:16px;padding:18px;box-shadow:0 5px 16px #17233d0b}.card b{display:block;font-size:24px;color:#6045b5}.card span{font-size:12px;color:#63718a}.ok{color:#18794e;font-weight:800}.warn{color:#9a6b00;font-weight:800}.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}h2{margin-top:0;font-size:18px}ul{line-height:1.8;margin-bottom:0}.timeline{display:grid;gap:10px}.step{display:flex;gap:12px;align-items:flex-start}.num{min-width:28px;height:28px;border-radius:50%;background:#eee9ff;color:#6045b5;display:grid;place-items:center;font-weight:800}.links a{display:inline-block;margin:4px 8px 4px 0;padding:9px 12px;border-radius:9px;background:#6045b5;color:white;text-decoration:none;font-size:13px}.meta{margin-top:18px;color:#63718a;font-size:12px}@media(max-width:720px){.grid,.cols{grid-template-columns:1fr 1fr}}@media(max-width:480px){.wrap{padding:14px}.grid,.cols{grid-template-columns:1fr}.hero{padding:20px}}
+</style>
+</head>
+<body><main class="wrap">
+<header class="hero"><h1>AI Course Studio v1.28.0</h1><p>AI 도구 학습관 · 승인형 Course 업데이트 · 안전한 Version 관리</p><p class="meta" style="color:#d9ddff">완료일: 2026-09-16 · 기준 버전: v1.27.2 → v1.28.0</p></header>
+<div class="grid"><div class="card"><b>130</b><span>전체 테스트 통과</span></div><div class="card"><b>0</b><span>정적 감사 Issues</span></div><div class="card"><b>16</b><span>신규 Learning Center 테이블</span></div><div class="card"><b>PASS</b><span>원본 Course 보존</span></div></div>
+<div class="cols"><section><h2>작업 순서</h2><div class="timeline">
+<div class="step"><span class="num">0</span><div><b>구조 감사</b><br>실제 소스와 지시서의 일치 여부를 Read-only로 확인했습니다.</div></div>
+<div class="step"><span class="num">1</span><div><b>데이터 기반</b><br>Learning Center·Update Registry·Course Version 스키마를 추가했습니다.</div></div>
+<div class="step"><span class="num">2</span><div><b>API 및 권한</b><br>인증 조회와 관리자 승인 경계를 분리했습니다.</div></div>
+<div class="step"><span class="num">3</span><div><b>UI 및 Seed</b><br>도구 학습 화면, Timeline, Prompt, 출처 구조를 연결했습니다.</div></div>
+<div class="step"><span class="num">4</span><div><b>Scanner 및 Diff</b><br>Course 참조를 기반으로 후보를 만들고 사람이 비교·승인하도록 했습니다.</div></div>
+<div class="step"><span class="num">5</span><div><b>최적화·회귀·릴리스</b><br>중복 Version 적용을 차단하고 기능 플래그, 원본 보존, EXE·BAT를 검증했습니다.</div></div>
+</div></section>
+<section><h2>안전성 판정</h2><ul><li class="ok">Application unchanged by Tailscale: PASS</li><li class="ok">Tailscale optional Host-only: PASS</li><li class="ok">Docker / DB / Storage independence: PASS</li><li class="ok">Public / Private separation: PASS</li><li class="ok">Original Course remains authoritative: PASS</li><li class="warn">공식 Evidence 검증 및 대규모 Scanner 비동기화: 후속 조건</li></ul></section></div>
+<section style="margin-top:16px"><h2>배포 파일</h2><p class="links"><a href="../AI_Course_Studio_v1_28_0.exe">v1.28.0 EXE</a><a href="../run_windows.bat">Windows 실행 BAT</a><a href="../run_windows_debug.bat">진단 BAT</a><a href="../DTS_Book_12_Auotexe.bat">DTS 실행 BAT</a><a href="../CHANGELOG_v1.28.0.md">변경 기록</a></p><p class="meta">기존 AI_Course_Studio_v1_27_2.exe는 호환성 비교와 안전한 복귀를 위해 삭제·덮어쓰기하지 않았습니다.</p></section>
+<section style="margin-top:16px"><h2>운영 권고</h2><ul><li>처음에는 <code>FEATURE_AI_TOOL_LEARNING_CENTER=false</code> 기본값을 유지하고 기존 기능을 먼저 확인합니다.</li><li>Learning Center를 사용할 때는 공식 출처 검증 후에만 업데이트를 승인합니다.</li><li>승인 후보는 Draft Version으로 검토하고 원본 Course를 직접 수정하지 않습니다.</li><li>Tailscale은 호스트의 선택형 사설 관리망으로만 사용합니다.</li></ul></section>
+<p class="meta">생성 문서: AI Course Studio v1.28.0 최종 작업 대시보드</p>
+</main></body></html>

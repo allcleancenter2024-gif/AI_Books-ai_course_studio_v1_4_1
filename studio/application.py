@@ -12,6 +12,7 @@ from .api.manual_routes import router as manual_router
 from .api.hybrid_routes import router as hybrid_router
 from .api.github_routes import router as github_router
 from .api.agent_routes import router as agent_router
+from .api.learning_routes import router as learning_router, command_router as learning_command_router
 from .api.routes import router
 from .db import init_db
 
@@ -34,6 +35,8 @@ def create_app():
     app.include_router(hybrid_router)
     app.include_router(github_router)
     app.include_router(agent_router)
+    app.include_router(learning_router)
+    app.include_router(learning_command_router)
     app.include_router(router)
 
     @app.middleware("http")

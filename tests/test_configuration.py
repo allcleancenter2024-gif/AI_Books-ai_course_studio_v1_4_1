@@ -20,6 +20,7 @@ from studio.config import (
     SCHEDULER_OWNER,
     configuration_summary,
     configuration_issues,
+    FEATURE_AI_TOOL_LEARNING_CENTER,
 )
 
 
@@ -36,6 +37,7 @@ def test_local_safe_defaults_and_authoritative_store_are_explicit():
     assert APP_PORT == 8765
     assert APP_BASE_URL == "http://127.0.0.1:8765"
     assert PUBLIC_ACCESS is False
+    assert FEATURE_AI_TOOL_LEARNING_CENTER is False
     assert DATA_STORE_ROLE == "sqlite-authoritative"
     assert MAX_UPLOAD_BYTES == 500 * 1024 * 1024
     assert LMSTUDIO_MAX_PARALLEL_CALLS == 1

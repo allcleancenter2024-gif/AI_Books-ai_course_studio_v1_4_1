@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
-title DTS Book 12 - AI Course Studio v1.27.2
+title DTS Book 12 - AI Course Studio v1.28.0
 
 rem Use ASCII-only output for CMD compatibility on all Korean Windows code pages.
 cd /d "%~dp0" || (
@@ -12,7 +12,7 @@ cd /d "%~dp0" || (
 
 echo.
 echo ============================================================
-echo   DTS Book 12 - AI Course Studio Launcher v1.27.2
+echo   DTS Book 12 - AI Course Studio Launcher v1.28.0
 echo ============================================================
 echo [INFO] Starting the current secured Studio launcher.
 echo [INFO] HWPX, PPTX, and PDF export support is included.

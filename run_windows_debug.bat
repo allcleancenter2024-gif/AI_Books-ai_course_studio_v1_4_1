@@ -1,8 +1,8 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
-title AI Course Studio v1.27.2 - Startup Diagnostics
+title AI Course Studio v1.28.0 - Startup Diagnostics
 cd /d "%~dp0"
-echo AI Course Studio v1.27.2 diagnostics
+echo AI Course Studio v1.28.0 diagnostics
 echo.
 where py.exe >nul 2>&1
 if not errorlevel 1 (

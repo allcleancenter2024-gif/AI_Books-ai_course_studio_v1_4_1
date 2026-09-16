@@ -22,6 +22,11 @@ from .errors import (
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
+from .local_model_policy import (
+    MAX_AUTOMATIC_MODEL_BYTES,
+    is_oversized_model,
+    is_reasoning_only_model,
+)
 from studio.config import (LMSTUDIO_BASE_URL, LMSTUDIO_ENABLED, LMSTUDIO_TIMEOUT_SECONDS,
                            OLLAMA_BASE_URL, OLLAMA_ENABLED, OLLAMA_TIMEOUT_SECONDS, AUDIT_SAFE_MODE)
 
@@ -92,7 +97,20 @@ class ProviderManager:
     def __init__(self) -> None:
         self.configs = {k: ProviderConfig(**asdict(v)) for k, v in DEFAULTS.items()}
         self._failover_lock = RLock()
+        # All local jobs share host RAM/VRAM. Serialize model inference across
+        # book and summary workers to prevent simultaneous model loads.
+        self._local_generation_lock = RLock()
         self._failover_events: list[dict[str, str]] = []
+
+    @staticmethod
+    def _is_reasoning_only_model(model: str) -> bool:
+        """Reject dedicated reasoning models; general models run with thinking off."""
+        return is_reasoning_only_model(model)
+
+    @staticmethod
+    def _is_oversized_local_model(model: str) -> bool:
+        """Block clearly oversized local models when server metadata is unavailable."""
+        return is_oversized_model(model)
 
     def get(self, name: str) -> ProviderConfig:
         if AUDIT_SAFE_MODE:
@@ -216,42 +234,65 @@ class ProviderManager:
         requests arriving together may race while the model instance is being
         created.  Explicit loading makes model failover deterministic.
         """
-        cfg = self.get("lmstudio")
-        rows = self._lmstudio_models(cfg)
-        row = next((item for item in rows if str(item.get("key")) == model), None)
-        if row is None:
-            raise ProviderError(f"LM Studio에 설치된 모델을 찾지 못했습니다: {model}")
-        if row.get("loaded_instances"):
-            return
-        max_context = int(row.get("max_context_length") or context_length)
-        body = {
-            "model": model,
-            "context_length": max(2048, min(int(context_length), max_context)),
-            "echo_load_config": False,
-        }
-        root = re.sub(r"/v1/?$", "", cfg.base_url.rstrip("/"), flags=re.I)
-        headers = {"Content-Type": "application/json"}
-        key = self._key(cfg)
-        if key:
-            headers["Authorization"] = f"Bearer {key}"
-        try:
-            response = httpx.post(
-                f"{root}/api/v1/models/load",
-                headers=headers,
-                json=body,
-                timeout=httpx.Timeout(cfg.timeout),
-            )
-            self._raise(response, "LM Studio 모델 로드")
-        except (httpx.TimeoutException, httpx.NetworkError) as exc:
-            raise ProviderError(f"LM Studio 모델 로드 중 연결이 끊겼습니다: {model}") from exc
+        with self._local_generation_lock:
+            cfg = self.get("lmstudio")
+            rows = self._lmstudio_models(cfg)
+            row = next((item for item in rows if str(item.get("key")) == model), None)
+            if row is None:
+                raise ProviderError(f"LM Studio에 설치된 모델을 찾지 못했습니다: {model}")
+            root = re.sub(r"/v1/?$", "", cfg.base_url.rstrip("/"), flags=re.I)
+            headers = {"Content-Type": "application/json"}
+            key = self._key(cfg)
+            if key:
+                headers["Authorization"] = f"Bearer {key}"
+            try:
+                # Keep exactly one chat LLM resident. Model failover previously
+                # left 8B, 9B and 27B instances loaded together until RAM was
+                # exhausted. Embedding instances are deliberately untouched.
+                for item in rows:
+                    if item.get("type") != "llm" or str(item.get("key")) == model:
+                        continue
+                    for instance in item.get("loaded_instances") or []:
+                        instance_id = str(instance.get("id") or "").strip()
+                        if not instance_id:
+                            continue
+                        response = httpx.post(
+                            f"{root}/api/v1/models/unload", headers=headers,
+                            json={"instance_id": instance_id}, timeout=httpx.Timeout(30.0),
+                        )
+                        self._raise(response, "LM Studio 이전 모델 해제")
+                if row.get("loaded_instances"):
+                    return
+                max_context = int(row.get("max_context_length") or context_length)
+                body = {
+                    "model": model,
+                    "context_length": max(2048, min(int(context_length), max_context)),
+                    "echo_load_config": False,
+                }
+                response = httpx.post(
+                    f"{root}/api/v1/models/load", headers=headers, json=body,
+                    timeout=httpx.Timeout(cfg.timeout),
+                )
+                self._raise(response, "LM Studio 모델 로드")
+            except (httpx.TimeoutException, httpx.NetworkError) as exc:
+                raise ProviderError(f"LM Studio 모델 전환 중 연결이 끊겼습니다: {model}") from exc
 
     @staticmethod
     def _recommended_lmstudio_models(rows: list[dict[str, Any]], current: str = "") -> list[str]:
-        """Order safe chat LLMs and never route generation to embeddings."""
+        """Order safe chat LLMs and never route generation to embeddings.
+
+        A failover is an emergency path, not permission to silently load an
+        arbitrarily large model first.  On a typical desktop a 27B model can
+        turn a recoverable slow-request problem into VRAM paging and repeated
+        timeout failures.  Keep every installed general model as a recovery
+        option for existing workflows, while ranking compact GGUF models first.
+        """
         usable = [
             row for row in rows
             if row.get("type") == "llm"
             and not re.search(r"embed|embedding|rerank|code|coder", str(row.get("key") or ""), re.I)
+            and not ProviderManager._is_reasoning_only_model(str(row.get("key") or ""))
+            and 0 < int(row.get("size_bytes") or 0) <= MAX_AUTOMATIC_MODEL_BYTES
         ]
         target = 3 * 1024**3
         usable.sort(key=lambda row: (
@@ -278,8 +319,13 @@ class ProviderManager:
             except Exception:
                 pass
         models = self.list_models(provider, strict=False)
-        usable = [model for model in models if not re.search(r"embed|embedding|rerank", model, re.I)]
-        if selected and selected not in usable:
+        usable = [
+            model for model in models
+            if not re.search(r"embed|embedding|rerank", model, re.I)
+            and not self._is_reasoning_only_model(model)
+            and not self._is_oversized_local_model(model)
+        ]
+        if selected and selected not in usable and not self._is_reasoning_only_model(selected) and not self._is_oversized_local_model(selected):
             usable.insert(0, selected)
         elif selected in usable:
             usable.remove(selected)
@@ -311,12 +357,17 @@ class ProviderManager:
         larger installed model when quality matters more than generation time.
         """
         names = [str(row.get("model") or row.get("name") or "") for row in rows]
-        if current and current in names:
+        current_row = next((row for row in rows if str(row.get("model") or row.get("name") or "") == current), None)
+        if (current_row and not ProviderManager._is_reasoning_only_model(current)
+                and not ProviderManager._is_oversized_local_model(current)
+                and 0 < int(current_row.get("size") or 0) <= MAX_AUTOMATIC_MODEL_BYTES):
             return current
         usable = [
             row for row in rows
             if not re.search(r"embed|embedding|rerank", str(row.get("model") or row.get("name") or ""), re.I)
-        ] or rows
+            and not ProviderManager._is_reasoning_only_model(str(row.get("model") or row.get("name") or ""))
+            and 0 < int(row.get("size") or 0) <= MAX_AUTOMATIC_MODEL_BYTES
+        ]
         general = [
             row for row in usable
             if not re.search(r"code|coder|opencode", str(row.get("model") or row.get("name") or ""), re.I)
@@ -324,6 +375,8 @@ class ProviderManager:
         balanced = [row for row in general if 2 * 1024**3 <= int(row.get("size") or 0) <= 6 * 1024**3]
         safe = [row for row in general if 0 < int(row.get("size") or 0) <= 8 * 1024**3]
         pool = balanced or safe or general
+        if not pool:
+            raise ProviderCapabilityError("8 GiB 이하의 비추론 로컬 모델을 찾지 못했습니다.")
         chosen = min(pool, key=lambda row: abs(int(row.get("size") or 0) - 3 * 1024**3))
         return str(chosen.get("model") or chosen.get("name"))
 
@@ -453,6 +506,12 @@ class ProviderManager:
     ) -> str:
         cfg = self.get(provider)
         chosen_model = (model or cfg.model).strip()
+        if provider in LOCAL_PROVIDERS and (
+            self._is_reasoning_only_model(chosen_model) or self._is_oversized_local_model(chosen_model)
+        ):
+            raise ProviderCapabilityError(
+                f"추론 전용 또는 14B 이상 모델은 메모리 보호 정책에 따라 사용할 수 없습니다: {chosen_model}"
+            )
         if not chosen_model and provider in ("lmstudio", "ollama"):
             if provider == "ollama":
                 rows = self._ollama_models(cfg)
@@ -473,19 +532,24 @@ class ProviderManager:
         if provider == "claude":
             return self._claude(cfg, chosen_model, system, prompt, max_tokens, temperature)
         if provider == "ollama":
-            return self._ollama_chat(cfg, chosen_model, system, prompt, max_tokens, temperature, json_mode=json_mode)
+            with self._local_generation_lock:
+                return self._ollama_chat(cfg, chosen_model, system, prompt, max_tokens, temperature, json_mode=json_mode)
         if provider == "lmstudio":
             candidates = (self.model_candidates(provider, chosen_model) or [chosen_model]) if allow_failover else [chosen_model]
+            # A single compact alternate is sufficient. Walking every model can
+            # load several multi-GiB weights in sequence and exhaust host RAM.
+            candidates = [item for item in candidates if not self._is_reasoning_only_model(item)][:2]
             errors: list[str] = []
-            for candidate in candidates:
-                try:
-                    text = self._lmstudio_chat(cfg, candidate, system, prompt, max_tokens, temperature, json_mode=json_mode)
-                    if candidate != chosen_model:
-                        self._record_failover(chosen_model, candidate, errors[-1] if errors else "이전 모델 생성 실패")
-                    cfg.model = candidate
-                    return text
-                except ProviderError as exc:
-                    errors.append(f"{candidate}: {exc}")
+            with self._local_generation_lock:
+                for candidate in candidates:
+                    try:
+                        text = self._lmstudio_chat(cfg, candidate, system, prompt, max_tokens, temperature, json_mode=json_mode)
+                        if candidate != chosen_model:
+                            self._record_failover(chosen_model, candidate, errors[-1] if errors else "이전 모델 생성 실패")
+                        cfg.model = candidate
+                        return text
+                    except ProviderError as exc:
+                        errors.append(f"{candidate}: {exc}")
             raise ProviderError("LM Studio 사용 가능 모델이 모두 생성에 실패했습니다. " + " | ".join(errors))
         raise ProviderError(f"지원하지 않는 Provider입니다: {provider}")
 

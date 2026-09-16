@@ -83,3 +83,11 @@ def require_authenticated(request: Request) -> dict:
     user = current_user(request.cookies.get(COOKIE_NAME))
     if not user: raise HTTPException(401, "로그인이 필요합니다.")
     return user
+
+
+def require_admin(request: Request) -> dict:
+    """Authorize high-trust administrative and agent-management endpoints."""
+    user = require_authenticated(request)
+    if user.get("role") != "admin":
+        raise HTTPException(403, "관리자 권한이 필요합니다.")
+    return user

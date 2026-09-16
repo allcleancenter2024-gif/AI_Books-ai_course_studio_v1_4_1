@@ -76,6 +76,24 @@ class HybridSearchRequest(HybridEvaluateRequest):
     max_results: int = Field(default=8, ge=1, le=20)
     freshness_days: int = Field(default=365, ge=0, le=3650)
 
+
+class AgentRagSearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+    source_ids: list[int] = Field(min_length=1, max_length=50)
+    max_total: int = Field(default=12_000, ge=500, le=24_000)
+
+
+class AgentTaskRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=12_000)
+    idempotency_key: str | None = Field(default=None, min_length=8, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
+
+
+class AgentSkillTaskRequest(BaseModel):
+    skill_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-z_]+$")
+    request: str = Field(min_length=1, max_length=8_000)
+    idempotency_key: str | None = Field(default=None, min_length=8, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
+    job_id: str | None = Field(default=None, min_length=8, max_length=128, pattern=r"^[A-Za-z0-9._:-]+$")
+
 class WebSourceRequest(BaseModel):
     url: str
     title: str = ""
@@ -133,3 +151,22 @@ class ExternalEditRequest(BaseModel):
     instruction: str = Field(min_length=1, max_length=4000)
     consent: bool = False
     cost_limit_usd: float = Field(gt=0, le=1000)
+
+UpdateDecision = Literal["KEEP", "PARTIAL_APPLY", "FULL_APPLY", "DEFER", "REJECT"]
+
+class UpdateDecisionRequest(BaseModel):
+    decision: UpdateDecision
+    reviewer: str = Field(min_length=1, max_length=100)
+    reason: str = Field(default="", max_length=2000)
+
+class UpdateApplyRequest(BaseModel):
+    reviewer: str = Field(min_length=1, max_length=100)
+    reason: str = Field(default="", max_length=2000)
+
+class CourseToolReferenceRequest(BaseModel):
+    tool_id: str = Field(min_length=1, max_length=100)
+    week_id: int | None = Field(default=None, ge=1, le=1000)
+    lesson_id: int | None = Field(default=None, ge=1)
+
+class CourseScanRequest(BaseModel):
+    tool_id: str | None = Field(default=None, min_length=1, max_length=100)

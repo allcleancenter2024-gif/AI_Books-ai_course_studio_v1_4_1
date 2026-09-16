@@ -115,6 +115,10 @@ def test_product_checked_date_is_catalog_date_not_server_start_date():
     assert all(row["change_note"] and row["source_url"] for row in products)
     changes = client.get("/api/products/changes").json()
     assert changes and all(row["baseline_info"] and row["changed_info"] and row["important_notes"] for row in changes)
+    catalog_script = client.get("/static/js/catalog.js")
+    assert catalog_script.status_code == 200
+    assert all(label in catalog_script.text for label in ("변경된 최신정보", "변경 전", "변경 후", "기준일", "공식 확인일", "변경정보 파일 다운로드"))
+    assert 'aria-expanded="false"' in catalog_script.text and "product-change-detail" in catalog_script.text
 
 
 def test_ssrf_url_validation_rejects_non_global_and_credentials():
@@ -204,7 +208,7 @@ def test_lmstudio_candidates_exclude_embeddings_and_rank_safe_gguf():
         {"key": "small:2b", "type": "llm", "size_bytes": 2 * 1024**3, "format": "gguf"},
         {"key": "balanced:4b", "type": "llm", "size_bytes": 3 * 1024**3, "format": "gguf"},
     ]
-    assert ProviderManager._recommended_lmstudio_models(rows) == ["balanced:4b", "small:2b", "large:20b"]
+    assert ProviderManager._recommended_lmstudio_models(rows) == ["balanced:4b", "small:2b"]
     assert ProviderManager._recommended_lmstudio_models(rows, "small:2b")[0] == "small:2b"
 
 
@@ -267,7 +271,7 @@ def test_ollama_default_is_unpinned_and_auto_selection_avoids_oversized_and_code
         {"model": "general:3b", "size": 3 * 1024**3},
     ]
     assert manager._recommended_ollama_model(rows) == "general:3b"
-    assert manager._recommended_ollama_model(rows, "huge-general:36b") == "huge-general:36b"
+    assert manager._recommended_ollama_model(rows, "huge-general:36b") == "general:3b"
 
 
 def test_ollama_native_chat_disables_thinking_and_sets_structured_output(monkeypatch):
@@ -358,7 +362,7 @@ def test_lmstudio_reasoning_only_response_is_classified_for_fast_failover(monkey
     monkeypatch.setattr("providers.engine.httpx.Client", Client)
     manager = ProviderManager()
     try:
-        manager.generate("lmstudio", "system", "prompt", model="reasoning-only", max_tokens=1100)
+        manager.generate("lmstudio", "system", "prompt", model="general-model", max_tokens=1100)
     except ProviderError as exc:
         assert "reasoning_budget_exhausted" in str(exc)
     else:
@@ -481,6 +485,75 @@ def test_lmstudio_reasoning_only_model_is_abandoned_after_one_item(monkeypatch):
     assert len(result["exercises"]) == 7
 
 
+def test_dedicated_reasoning_models_are_rejected_before_inference():
+    manager = ProviderManager()
+    manager.configs["lmstudio"].model = "deepseek-r1:8b"
+    try:
+        manager.generate("lmstudio", "system", "prompt")
+    except generation_service.ProviderError as exc:
+        assert "추론 전용 또는 14B 이상 모델" in str(exc)
+    else:
+        raise AssertionError("reasoning-only model must not start inference")
+
+
+def test_interrupted_job_with_null_result_can_be_loaded(tmp_path, monkeypatch):
+    from studio.services import job_status
+    from studio import db
+
+    database = tmp_path / "jobs.db"
+    monkeypatch.setattr(db, "DB_PATH", database)
+    store = job_status.JobStore()
+    store.update("resume-me", phase="interrupted", payload={"kind": "book_generation"}, result=None)
+    reloaded = job_status.JobStore().get("resume-me")
+    assert reloaded["phase"] == "interrupted"
+    assert reloaded["result"] is None
+    assert reloaded["payload"] == {"kind": "book_generation"}
+
+
+def test_lmstudio_automatic_candidates_exclude_oversized_and_reasoning_models():
+    rows = [
+        {"key": "safe-4b", "type": "llm", "format": "gguf", "size_bytes": 3 * 1024**3},
+        {"key": "deepseek-r1-7b", "type": "llm", "format": "gguf", "size_bytes": 4 * 1024**3},
+        {"key": "large-27b", "type": "llm", "format": "gguf", "size_bytes": 18 * 1024**3},
+    ]
+    assert ProviderManager._recommended_lmstudio_models(rows) == ["safe-4b"]
+
+
+def test_lmstudio_loader_unloads_other_llm_instances(monkeypatch):
+    manager = ProviderManager()
+    rows = [
+        {"key": "selected:4b", "type": "llm", "loaded_instances": [{"id": "selected:4b"}]},
+        {"key": "stale:8b", "type": "llm", "loaded_instances": [{"id": "stale:8b"}]},
+        {"key": "embedding", "type": "embedding", "loaded_instances": [{"id": "embedding"}]},
+    ]
+    calls = []
+
+    class Response:
+        status_code = 200
+        is_success = True
+        text = ""
+
+    monkeypatch.setattr(manager, "_lmstudio_models", lambda cfg: rows)
+    monkeypatch.setattr("providers.engine.httpx.post", lambda url, **kwargs: calls.append((url, kwargs.get("json"))) or Response())
+    manager.ensure_lmstudio_model_loaded("selected:4b")
+    assert calls == [("http://127.0.0.1:12345/api/v1/models/unload", {"instance_id": "stale:8b"})]
+
+
+def test_book_generation_rejects_a_saturated_queue(monkeypatch):
+    class FullQueue:
+        def acquire(self, blocking=False):
+            return False
+
+    monkeypatch.setattr(generation_service, "_book_capacity_slots", FullQueue())
+    try:
+        generation_service.start_book_generation("lmstudio", 12, "전체 초보자", 1, 1, job_id="book-queue-full")
+    except generation_service.HTTPException as exc:
+        assert exc.status_code == 429
+    else:
+        raise AssertionError("a saturated book queue must reject new work")
+    assert jobs.get("book-queue-full") is None
+
+
 def test_ollama_generation_without_ui_auto_connect_uses_same_balanced_recommendation(monkeypatch):
     manager = ProviderManager()
     rows = [
@@ -515,6 +588,7 @@ def test_generation_keeps_book_when_a_model_stage_times_out(monkeypatch):
         raise generation_service.ProviderError("OpenAI 연결이 반복해서 시간초과되었습니다.")
 
     monkeypatch.setattr(generation_service.providers, "generate", timeout)
+    monkeypatch.setattr(generation_service.providers, "ensure_lmstudio_model_loaded", lambda *args, **kwargs: None)
     book = generation_service.build_book("lmstudio", 12, "전체 초보자", 1, 1)
     assert book["book_id"] > 0
     assert len(book["content"]) == 1
@@ -531,6 +605,7 @@ def test_verified_change_is_appended_to_the_selected_book_file(monkeypatch):
 
     from studio.db import connect
     monkeypatch.setattr(generation_service.providers, "generate", timeout)
+    monkeypatch.setattr(generation_service.providers, "ensure_lmstudio_model_loaded", lambda *args, **kwargs: None)
     book = generation_service.build_book("lmstudio", 12, "전체 초보자", 1, 1)
     path = Path(book["md_path"])
     try:
@@ -567,6 +642,7 @@ def test_education_quality_pipeline_stores_profile_and_approval(monkeypatch):
         raise generation_service.ProviderError("test fallback")
 
     monkeypatch.setattr(generation_service.providers, "generate", timeout)
+    monkeypatch.setattr(generation_service.providers, "ensure_lmstudio_model_loaded", lambda *args, **kwargs: None)
     book = generation_service.build_book("lmstudio", 12, "60대", 1, 1, experience="도움 있으면 가능", device_paths=["pc_web", "android_app"])
     try:
         lesson = book["content"][0]
@@ -608,6 +684,32 @@ def test_local_summary_never_sends_an_oversized_context():
     progress = []
     result = summarize_text(fake, "lmstudio", "AI 교육 자료입니다. " * 2_000, lambda done, total, message: progress.append((done, total, message)))
     assert result and len(fake.prompts) > 2 and progress
+
+
+def test_local_summary_uses_a_source_only_fallback_when_the_model_times_out():
+    class TimedOutProvider:
+        def generate(self, *args, **kwargs):
+            raise generation_service.ProviderError("LM Studio timeout")
+    result = summarize_text(TimedOutProvider(), "lmstudio", "첫 번째 사실입니다. 2026년 9월 11일 기준 수치입니다. " * 80)
+    assert getattr(result, "used_fallback", False) is True
+    assert "AI 모델 응답이 제한 시간 안에 끝나지 않아" in result
+    assert "2026년 9월 11일" in result
+
+
+def test_local_summary_never_fans_out_to_every_lmstudio_model():
+    class SelectedModelOnlyProvider:
+        def __init__(self):
+            self.calls = []
+
+        def generate(self, *args, **kwargs):
+            self.calls.append(kwargs)
+            raise generation_service.ProviderError("LM Studio timeout")
+
+    provider = SelectedModelOnlyProvider()
+    result = summarize_text(provider, "lmstudio", "요약 대상 문장입니다. " * 100)
+    assert getattr(result, "used_fallback", False) is True
+    assert len(provider.calls) == 1
+    assert provider.calls[0]["allow_failover"] is False
 
 
 def test_summary_is_saved_as_a_markdown_file():

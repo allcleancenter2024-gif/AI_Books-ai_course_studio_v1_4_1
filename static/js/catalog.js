@@ -2,9 +2,49 @@ import {api, post, esc} from './api.js';
 
 const $ = id => document.getElementById(id);
 
+function productChangeMarkdown(item) {
+  return [
+    `# ${item.current_name} 변경된 최신정보`, '',
+    `- 기준일: ${item.release_date}`,
+    `- 공식 확인일: ${item.checked_date}`,
+    `- 변경 확인일: ${item.changed_date || item.checked_date}`,
+    `- 공식 출처 수준: ${item.source_level}`, '',
+    '## 변경 전', '', item.baseline_info, '',
+    '## 변경 후', '', item.changed_info, '',
+    '## 변경 요약', '', item.change_note, '',
+    '## 확인할 내용', '', item.important_notes, '',
+    `- 공식 웹페이지: ${item.source_url}`, '',
+  ].join('\n');
+}
+
+function downloadProductChange(item) {
+  const blob = new Blob([productChangeMarkdown(item)], {type: 'text/markdown;charset=utf-8'});
+  const url = URL.createObjectURL(blob), link = document.createElement('a');
+  const safeName = String(item.current_name || 'ai-product').replace(/[^0-9A-Za-z가-힣_-]+/g, '_');
+  link.href = url;
+  link.download = `${safeName}_변경된_최신정보_${item.checked_date}.md`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function productChangeDetail(item, index) {
+  const panelId = `product-change-${index}`;
+  return `<tr class="product-change-detail" id="${panelId}" hidden><td colspan="6"><section class="product-change-panel" aria-label="${esc(item.current_name)} 변경된 최신정보"><header><div><h3>${esc(item.current_name)} 변경 기록</h3><p>${esc(item.change_note)}</p></div><span class="product-change-badge">${item.is_major ? '큰 변화' : '정보 갱신'}</span></header><div class="product-change-dates"><div><span>기준일</span><b>${esc(item.release_date)}</b></div><div><span>공식 확인일</span><b>${esc(item.checked_date)}</b></div><div><span>변경 확인일</span><b>${esc(item.changed_date || item.checked_date)}</b></div><div><span>출처</span><b>${esc(item.source_level)}</b></div></div><div class="product-change-compare"><article class="before"><span>변경 전</span><p>${esc(item.baseline_info)}</p></article><article class="after"><span>변경 후</span><p>${esc(item.changed_info)}</p></article></div><div class="product-change-summary"><b>변경 내용 요약</b><p>${esc(item.important_notes)}</p></div><footer><button type="button" class="secondary product-change-download" data-product-download="${index}">변경정보 파일 다운로드</button><a class="official-link" href="${esc(item.source_url)}" target="_blank" rel="noopener noreferrer">공식 웹페이지 확인 ↗</a></footer></section></td></tr>`;
+}
+
 export async function loadProducts() {
   const data = await api('/api/products');
-  $('products').innerHTML = `<div class="table-wrap"><table><thead><tr><th>제품</th><th>현재 정보</th><th>기준일</th><th>변경 상태</th><th>공식 확인일</th><th>공식 웹페이지</th></tr></thead><tbody>${data.map(item => { const changed = Boolean(item.has_changes), label = changed ? '변경 사항 있음' : '변경 사항 없음'; return `<tr><td><b>${esc(item.current_name)}</b><br><span class="small">${esc(item.company)}</span></td><td>${esc(item.current_version)}<br><span class="small">${esc(item.features)}</span></td><td>${esc(item.release_date)}</td><td><span class="change-state"><i class="change-dot ${changed ? 'changed' : 'unchanged'}" aria-hidden="true"></i>${label}</span><br><span class="small">${esc(item.change_note)}</span></td><td>${esc(item.checked_date)} · ${esc(item.source_level)}</td><td><a class="official-link" href="${esc(item.source_url)}" target="_blank" rel="noopener noreferrer">공식 웹페이지 열기 ↗</a></td></tr>`; }).join('')}</tbody></table></div>`;
+  $('products').innerHTML = `<div class="table-wrap products-table"><table><thead><tr><th>제품</th><th>현재 정보</th><th>기준일</th><th>변경 상태</th><th>공식 확인일</th><th>공식 웹페이지</th></tr></thead><tbody>${data.map((item, index) => { const changed = Boolean(item.has_changes), label = changed ? '변경 사항 있음' : '변경 사항 없음'; return `<tr class="product-row"><td><b>${esc(item.current_name)}</b><br><span class="small">${esc(item.company)}</span></td><td>${esc(item.current_version)}<br><span class="small">${esc(item.features)}</span></td><td>${esc(item.release_date)}</td><td><span class="change-state"><i class="change-dot ${changed ? 'changed' : 'unchanged'}" aria-hidden="true"></i>${label}</span><br><span class="small">${esc(item.change_note)}</span>${changed ? `<br><button type="button" class="product-change-toggle" data-product-change="${index}" aria-expanded="false" aria-controls="product-change-${index}">변경된 최신정보</button>` : ''}</td><td>${esc(item.checked_date)} · ${esc(item.source_level)}</td><td><a class="official-link" href="${esc(item.source_url)}" target="_blank" rel="noopener noreferrer">공식 웹페이지 열기 ↗</a></td></tr>${changed ? productChangeDetail(item, index) : ''}`; }).join('')}</tbody></table></div>`;
+  document.querySelectorAll('[data-product-change]').forEach(button => button.addEventListener('click', () => {
+    const panel = document.getElementById(`product-change-${button.dataset.productChange}`);
+    const show = panel.hidden;
+    panel.hidden = !show;
+    button.setAttribute('aria-expanded', String(show));
+    button.textContent = show ? '변경된 최신정보 닫기' : '변경된 최신정보';
+  }));
+  document.querySelectorAll('[data-product-download]').forEach(button => button.addEventListener('click', () => {
+    downloadProductChange(data[Number(button.dataset.productDownload)]);
+  }));
 }
 
 function changesMarkdown(rows) {
