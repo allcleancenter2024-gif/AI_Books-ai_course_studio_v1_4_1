@@ -13,7 +13,8 @@ def _client():
     return client
 
 
-def test_learning_api_is_hidden_when_feature_flag_is_off():
+def test_learning_api_is_hidden_when_feature_flag_is_off(monkeypatch):
+    monkeypatch.setattr(learning_routes, "FEATURE_AI_TOOL_LEARNING_CENTER", False)
     client = _client()
     response = client.get("/api/learning-tools")
     assert response.status_code == 404

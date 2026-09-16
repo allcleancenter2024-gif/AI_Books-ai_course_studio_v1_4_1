@@ -37,3 +37,7 @@ def test_learning_center_ui_is_feature_flag_driven_and_escapes_content():
     assert "learning-diff" in learning_css
     assert "initUpdateCenter" in js
     assert "PARTIAL_APPLY" in js
+    assert "학습·업데이트" in js
+    assert "learning-update-nav" in js
+    assert "workspace-control-grid" in js
+    assert ".workspace-control-card" in css

@@ -8,7 +8,7 @@ load_dotenv(PROJECT_DIR / ".env", override=False)
 
 # Versioning policy: patch for small fixes (v1.4.1 -> v1.4.2), minor for
 # substantial user-facing changes (v1.4.1 -> v1.5.0).
-VERSION = "1.28.0"
+VERSION = "1.29.0"
 LAST_UPDATED = "2026-09-16"
 APP_TITLE = f"AI 강의 활용 Studio v{VERSION} [{LAST_UPDATED}]"
 BASE_DIR = PROJECT_DIR
@@ -38,7 +38,9 @@ APP_BASE_URL = f"http://{APP_HOST}:{APP_PORT}"
 PUBLIC_ACCESS = _env_flag("PUBLIC_ACCESS", False)
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").strip()
 AUDIT_SAFE_MODE = _env_flag("AI_COURSE_STUDIO_AUDIT_SAFE_MODE", False)
-FEATURE_AI_TOOL_LEARNING_CENTER = _env_flag("FEATURE_AI_TOOL_LEARNING_CENTER", False)
+# The learning/update surfaces are part of the shipped Studio workflow. An
+# operator can still disable them explicitly for a constrained deployment.
+FEATURE_AI_TOOL_LEARNING_CENTER = _env_flag("FEATURE_AI_TOOL_LEARNING_CENTER", True)
 
 # SQLite remains the authoritative Studio store in this release.  The Docker
 # PostgreSQL/MongoDB stack is optional replication/integration infrastructure,
